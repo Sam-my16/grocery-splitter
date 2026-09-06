@@ -1,31 +1,25 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
-import {
-  getAuth, signInAnonymously, onAuthStateChanged
-} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
-import {
-  getFirestore, collection, addDoc, deleteDoc, doc,
-  getDocs, query, orderBy, serverTimestamp
-} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
-import { firebaseConfig, PEOPLE } from "./firebase-config.js";
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+import { SUPABASE_URL, SUPABASE_ANON_KEY, PEOPLE } from "./supabase-config.js";
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const statusEl = document.getElementById("auth-status");
 let ready = false;
 
-onAuthStateChanged(auth, (user) => {
-  if (user) {
-    ready = true;
-    statusEl.textContent = "Conectado";
-    loadHistory();
-    loadBalances();
+(async () => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    const { error } = await supabase.auth.signInAnonymously();
+    if (error) {
+      statusEl.textContent = "Error de conexión: " + error.message;
+      return;
+    }
   }
-});
-signInAnonymously(auth).catch((err) => {
-  statusEl.textContent = "Error de conexión: " + err.message;
-});
+  ready = true;
+  statusEl.textContent = "Conectado";
+  loadHistory();
+  loadBalances();
+})();
 
 // ---------- Tabs ----------
 document.querySelectorAll(".tab-btn").forEach((btn) => {
@@ -155,39 +149,43 @@ document.getElementById("save-bill-btn").addEventListener("click", async () => {
   const payer = document.getElementById("bill-payer").value;
   const date = document.getElementById("bill-date").value;
 
-  try {
-    await addDoc(collection(db, "bills"), {
-      date,
-      payer,
-      total,
-      items,
-      shares,
-      createdAt: serverTimestamp()
-    });
-    document.getElementById("save-status").textContent = "Guardado.";
-    items = [];
-    document.getElementById("csv-input").value = "";
-    document.getElementById("items-card").hidden = true;
-    document.getElementById("save-card").hidden = true;
-    document.getElementById("bill-total").value = "";
-    loadHistory();
-    loadBalances();
-  } catch (err) {
-    document.getElementById("save-status").textContent = "Error: " + err.message;
+  const { error } = await supabase.from("bills").insert({
+    date, payer, total, items, shares
+  });
+
+  if (error) {
+    document.getElementById("save-status").textContent = "Error: " + error.message;
+    return;
   }
+
+  document.getElementById("save-status").textContent = "Guardado.";
+  items = [];
+  document.getElementById("csv-input").value = "";
+  document.getElementById("items-card").hidden = true;
+  document.getElementById("save-card").hidden = true;
+  document.getElementById("bill-total").value = "";
+  loadHistory();
+  loadBalances();
 });
 
 // ---------- History ----------
 async function loadHistory() {
   const el = document.getElementById("history-list");
-  const snap = await getDocs(query(collection(db, "bills"), orderBy("date", "desc")));
-  if (snap.empty) {
+  const { data: bills, error } = await supabase
+    .from("bills")
+    .select("*")
+    .order("date", { ascending: false });
+
+  if (error) {
+    el.textContent = "Error cargando historial: " + error.message;
+    return;
+  }
+  if (!bills || bills.length === 0) {
     el.textContent = "Todavía no hay compras cargadas.";
     return;
   }
   el.innerHTML = "";
-  snap.forEach((docSnap) => {
-    const bill = docSnap.data();
+  bills.forEach((bill) => {
     const details = document.createElement("details");
     details.className = "history-item";
     const summary = document.createElement("summary");
@@ -209,7 +207,7 @@ async function loadHistory() {
     delBtn.addEventListener("click", async (e) => {
       e.preventDefault();
       if (!confirm("¿Eliminar esta compra?")) return;
-      await deleteDoc(doc(db, "bills", docSnap.id));
+      await supabase.from("bills").delete().eq("id", bill.id);
       loadHistory();
       loadBalances();
     });
@@ -223,11 +221,15 @@ async function loadHistory() {
 async function loadBalances() {
   const balEl = document.getElementById("balances-list");
   const settleEl = document.getElementById("settle-list");
-  const snap = await getDocs(collection(db, "bills"));
+  const { data: bills, error } = await supabase.from("bills").select("payer,total,shares");
+
+  if (error) {
+    balEl.textContent = "Error cargando balances: " + error.message;
+    return;
+  }
 
   const balances = Object.fromEntries(PEOPLE.map((p) => [p, 0]));
-  snap.forEach((docSnap) => {
-    const bill = docSnap.data();
+  (bills || []).forEach((bill) => {
     balances[bill.payer] = (balances[bill.payer] || 0) + bill.total;
     PEOPLE.forEach((p) => {
       balances[p] -= (bill.shares && bill.shares[p]) || 0;

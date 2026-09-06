@@ -6,7 +6,7 @@ IA a partir de la foto/lista de la compra), asignás cada item a una o varias
 personas, y la app calcula cuánto le corresponde pagar a cada uno y quién le
 debe a quién, mes a mes.
 
-Los datos (boletas, balances) se guardan en Firebase Firestore para que los
+Los datos (boletas, balances) se guardan en Supabase (Postgres) para que los
 tres vean lo mismo desde cualquier dispositivo.
 
 ## Cómo usar la app (flujo mensual)
@@ -30,23 +30,22 @@ tres vean lo mismo desde cualquier dispositivo.
 
 ## Setup (una sola vez)
 
-### 1. Crear el proyecto de Firebase
+### 1. Crear el proyecto de Supabase
 
-1. Andá a [console.firebase.google.com](https://console.firebase.google.com/)
-   y creá un proyecto nuevo (gratis, plan Spark alcanza).
-2. **Build → Firestore Database → Create database** (modo producción,
-   cualquier región).
-3. **Build → Authentication → Get started → Sign-in method → Anonymous →
-   Enable.** Esto permite que la app identifique "alguien de la casa" sin
-   pedir usuario/contraseña.
-4. **Project settings (ícono de engranaje) → General → Your apps → Web
-   (`</>`)**. Registrá una app y copiá el objeto `firebaseConfig` que te
-   muestra.
-5. Pegá esos valores en [`js/firebase-config.js`](js/firebase-config.js),
-   reemplazando los `"REEMPLAZAR"`. No son secretos (identifican el
-   proyecto, no dan acceso), así que está bien commitearlos.
-6. **Firestore → Rules**, pegá el contenido de
-   [`firestore.rules`](firestore.rules) y publicá.
+1. Andá a [supabase.com](https://supabase.com/), creá una cuenta y un
+   proyecto nuevo (plan Free alcanza). Elegí una contraseña de base de
+   datos (no la vas a necesitar para esto, pero Supabase la pide).
+2. **Authentication → Sign In / Providers → Anonymous Sign-Ins → activalo.**
+   Esto permite que la app identifique "alguien de la casa" sin pedir
+   usuario/contraseña.
+3. **SQL Editor → New query**, pegá el contenido de
+   [`supabase.sql`](supabase.sql) y ejecutalo. Esto crea la tabla `bills` y
+   las políticas de seguridad (Row Level Security).
+4. **Project Settings → API**. Copiá el **Project URL** y la **anon
+   public key**.
+5. Pegá esos valores en [`js/supabase-config.js`](js/supabase-config.js),
+   reemplazando los `"REEMPLAZAR"`. La anon key no es secreta (el acceso
+   real lo controlan las políticas de RLS), así que está bien commitearla.
 
 ### 2. Activar GitHub Pages
 
@@ -57,7 +56,7 @@ En el repo: **Settings → Pages → Source: Deploy from a branch → Branch:
 ### 3. Personalizar nombres
 
 Si alguno de los nombres cambia, editá el array `PEOPLE` en
-[`js/firebase-config.js`](js/firebase-config.js).
+[`js/supabase-config.js`](js/supabase-config.js).
 
 ## Formato del CSV
 
@@ -84,6 +83,6 @@ avisa si no coincide).
 ## Stack
 
 Sin build ni framework: HTML/CSS/JS plano + [PapaParse](https://www.papaparse.com/)
-para el CSV + Firebase (Auth anónima + Firestore) para los datos
-compartidos. Todo corre en el navegador, servido como página estática por
-GitHub Pages.
+para el CSV + [Supabase](https://supabase.com/) (Auth anónima + Postgres)
+para los datos compartidos. Todo corre en el navegador, servido como
+página estática por GitHub Pages.
