@@ -1,0 +1,89 @@
+# Grocery Splitter
+
+Sitio estático para dividir las compras del supermercado entre Sammy, Nahobe
+y Gabriel. Subís un CSV con los items de la boleta (generado por un agente de
+IA a partir de la foto/lista de la compra), asignás cada item a una o varias
+personas, y la app calcula cuánto le corresponde pagar a cada uno y quién le
+debe a quién, mes a mes.
+
+Los datos (boletas, balances) se guardan en Firebase Firestore para que los
+tres vean lo mismo desde cualquier dispositivo.
+
+## Cómo usar la app (flujo mensual)
+
+1. Después de cada compra, pedile a un agente (Claude, Gemini, etc.) algo así:
+
+   > Te paso la lista de items y precios de esta boleta del supermercado,
+   > incluyendo los descuentos aplicados. Devolveme un CSV con dos columnas,
+   > `item,price`, donde `price` sea el precio final ya con el descuento
+   > aplicado a cada item. La suma de la columna `price` tiene que dar el
+   > total de la boleta.
+
+2. Entrá a la página, pestaña **Nueva compra**, pegá el CSV (o subí el
+   archivo) y tocá **Parsear**.
+3. Asigná cada item a Sammy, Nahobe y/o Gabriel (tocá más de uno para
+   dividirlo entre varios).
+4. Revisá que la suma de items coincida con el total real de la boleta,
+   elegí la fecha y quién pagó, y guardá.
+5. En la pestaña **Balances** vas a ver cuánto le debe cada uno a la casa,
+   y sugerencias de transferencias para saldar cuentas.
+
+## Setup (una sola vez)
+
+### 1. Crear el proyecto de Firebase
+
+1. Andá a [console.firebase.google.com](https://console.firebase.google.com/)
+   y creá un proyecto nuevo (gratis, plan Spark alcanza).
+2. **Build → Firestore Database → Create database** (modo producción,
+   cualquier región).
+3. **Build → Authentication → Get started → Sign-in method → Anonymous →
+   Enable.** Esto permite que la app identifique "alguien de la casa" sin
+   pedir usuario/contraseña.
+4. **Project settings (ícono de engranaje) → General → Your apps → Web
+   (`</>`)**. Registrá una app y copiá el objeto `firebaseConfig` que te
+   muestra.
+5. Pegá esos valores en [`js/firebase-config.js`](js/firebase-config.js),
+   reemplazando los `"REEMPLAZAR"`. No son secretos (identifican el
+   proyecto, no dan acceso), así que está bien commitearlos.
+6. **Firestore → Rules**, pegá el contenido de
+   [`firestore.rules`](firestore.rules) y publicá.
+
+### 2. Activar GitHub Pages
+
+En el repo: **Settings → Pages → Source: Deploy from a branch → Branch:
+`main` / `(root)` → Save**. Después de un minuto la página va a estar en
+`https://sam-my16.github.io/grocery-splitter/`.
+
+### 3. Personalizar nombres
+
+Si alguno de los nombres cambia, editá el array `PEOPLE` en
+[`js/firebase-config.js`](js/firebase-config.js).
+
+## Formato del CSV
+
+Columnas esperadas (nombres flexibles, detecta variantes en español/inglés):
+
+| item / producto | price / precio |
+|---|---|
+| Leche | 1200 |
+| Pan | 900 |
+
+`price` debe ser el precio final del item, descuento ya aplicado. La suma de
+la columna tiene que coincidir con el total real de la boleta (la app te
+avisa si no coincide).
+
+## Ideas para más adelante
+
+- Categorías por item (limpieza, almacén, verdulería) y gráficos de gasto
+  por categoría a lo largo del tiempo.
+- Notificación (WhatsApp/email) recordando de quién es el turno de comprar.
+- PWA instalable para que se sienta como una app en el celular.
+- Autocompletar items recurrentes para no tener que asignarlos cada vez.
+- Exportar el resumen mensual a PDF.
+
+## Stack
+
+Sin build ni framework: HTML/CSS/JS plano + [PapaParse](https://www.papaparse.com/)
+para el CSV + Firebase (Auth anónima + Firestore) para los datos
+compartidos. Todo corre en el navegador, servido como página estática por
+GitHub Pages.

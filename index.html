@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grocery Splitter</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="topbar">
+  <h1>🛒 Grocery Splitter</h1>
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="new-bill">Nueva compra</button>
+    <button class="tab-btn" data-tab="history">Historial</button>
+    <button class="tab-btn" data-tab="balances">Balances</button>
+  </nav>
+</header>
+
+<main>
+  <div id="auth-status" class="status-bar"></div>
+
+  <!-- NEW BILL TAB -->
+  <section id="new-bill" class="tab-panel active">
+    <div class="card">
+      <h2>1. Pegá o subí el CSV</h2>
+      <p class="hint">Pedile al agente (Claude, Gemini, etc.) que te devuelva un CSV con columnas <code>item,price</code> donde <code>price</code> ya tenga el descuento aplicado. Pegalo abajo o subí el archivo.</p>
+      <textarea id="csv-input" rows="6" placeholder="item,price&#10;Leche,1200&#10;Pan,900&#10;..."></textarea>
+      <div class="row">
+        <input type="file" id="csv-file" accept=".csv,text/csv">
+        <button id="parse-btn" class="primary">Parsear</button>
+      </div>
+    </div>
+
+    <div class="card" id="items-card" hidden>
+      <h2>2. Asigná cada item</h2>
+      <table id="items-table">
+        <thead>
+          <tr><th>Item</th><th>Precio</th><th>Asignar a</th></tr>
+        </thead>
+        <tbody id="items-tbody"></tbody>
+      </table>
+      <div class="row totals">
+        <span>Suma de items: <strong id="sum-items">$0</strong></span>
+        <label>Total de la boleta: <input type="number" id="bill-total" step="0.01"></label>
+        <span id="total-match" class="badge"></span>
+      </div>
+    </div>
+
+    <div class="card" id="save-card" hidden>
+      <h2>3. Guardar</h2>
+      <div class="row">
+        <label>Fecha
+          <input type="date" id="bill-date">
+        </label>
+        <label>¿Quién pagó?
+          <select id="bill-payer">
+            <option>Sammy</option>
+            <option>Nahobe</option>
+            <option>Gabriel</option>
+          </select>
+        </label>
+        <button id="save-bill-btn" class="primary">Guardar compra</button>
+      </div>
+      <p id="save-status" class="hint"></p>
+    </div>
+  </section>
+
+  <!-- HISTORY TAB -->
+  <section id="history" class="tab-panel">
+    <div class="card">
+      <h2>Compras anteriores</h2>
+      <div id="history-list">Cargando...</div>
+    </div>
+  </section>
+
+  <!-- BALANCES TAB -->
+  <section id="balances" class="tab-panel">
+    <div class="card">
+      <h2>Balance actual</h2>
+      <div id="balances-list">Cargando...</div>
+    </div>
+    <div class="card">
+      <h2>Cómo saldar cuentas</h2>
+      <div id="settle-list"></div>
+    </div>
+  </section>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
