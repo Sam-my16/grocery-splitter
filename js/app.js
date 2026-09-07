@@ -6,12 +6,21 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const statusEl = document.getElementById("auth-status");
 let ready = false;
 
+function friendlyError(error) {
+  if (!error) return "";
+  if (/future|issued at|clock/i.test(error.message)) {
+    return "La fecha y hora de tu celular están mal. Activá \"Ajustar automáticamente\" " +
+      "en Ajustes → General → Fecha y hora, y volvé a entrar a la página.";
+  }
+  return "Error: " + error.message;
+}
+
 (async () => {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) {
     const { error } = await supabase.auth.signInAnonymously();
     if (error) {
-      statusEl.textContent = "Error de conexión: " + error.message;
+      statusEl.textContent = friendlyError(error);
       return;
     }
   }
@@ -198,7 +207,7 @@ document.getElementById("save-bill-btn").addEventListener("click", async () => {
   });
 
   if (error) {
-    document.getElementById("save-status").textContent = "Error: " + error.message;
+    document.getElementById("save-status").textContent = friendlyError(error);
     return;
   }
 
@@ -222,7 +231,7 @@ async function loadHistory() {
     .order("date", { ascending: false });
 
   if (error) {
-    el.textContent = "Error cargando historial: " + error.message;
+    el.textContent = friendlyError(error);
     return;
   }
   if (!bills || bills.length === 0) {
@@ -284,7 +293,7 @@ async function loadBalances() {
   ]);
 
   if (billsErr) {
-    balEl.textContent = "Error cargando balances: " + billsErr.message;
+    balEl.textContent = friendlyError(billsErr);
     return;
   }
 

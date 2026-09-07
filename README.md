@@ -71,6 +71,13 @@ Columnas esperadas (nombres flexibles, detecta variantes en español/inglés):
 la columna tiene que coincidir con el total real de la boleta (la app te
 avisa si no coincide).
 
+## Problemas comunes
+
+**"La fecha y hora de tu celular están mal" / error de conexión.** El login
+anónimo de Supabase depende de que el reloj del dispositivo esté bien
+sincronizado. Solución: **Ajustes → General → Fecha y hora → activar
+"Ajustar automáticamente"**, y volver a entrar a la página.
+
 ## Ideas para más adelante
 
 - Categorías por item (limpieza, almacén, verdulería) y gráficos de gasto
