@@ -232,4 +232,13 @@ th, td {
 .settle-row {
   padding: 0.4rem 0;
   font-size: 0.95rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.settle-row:last-child {
+  border-bottom: none;
 }

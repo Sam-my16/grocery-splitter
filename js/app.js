@@ -276,10 +276,15 @@ async function loadHistory() {
 async function loadBalances() {
   const balEl = document.getElementById("balances-list");
   const settleEl = document.getElementById("settle-list");
-  const { data: bills, error } = await supabase.from("bills").select("payer,total,shares");
+  const paymentsEl = document.getElementById("payments-list");
 
-  if (error) {
-    balEl.textContent = "Error cargando balances: " + error.message;
+  const [{ data: bills, error: billsErr }, { data: payments, error: paysErr }] = await Promise.all([
+    supabase.from("bills").select("payer,total,shares"),
+    supabase.from("settlements").select("*").order("created_at", { ascending: false })
+  ]);
+
+  if (billsErr) {
+    balEl.textContent = "Error cargando balances: " + billsErr.message;
     return;
   }
 
@@ -289,6 +294,10 @@ async function loadBalances() {
     PEOPLE.forEach((p) => {
       balances[p] -= (bill.shares && bill.shares[p]) || 0;
     });
+  });
+  (payments || []).forEach((s) => {
+    balances[s.from_person] = (balances[s.from_person] || 0) + s.amount;
+    balances[s.to_person] = (balances[s.to_person] || 0) - s.amount;
   });
 
   balEl.innerHTML = "";
@@ -312,7 +321,7 @@ async function loadBalances() {
   const transfers = [];
   while (ci < creditors.length && di < debtors.length) {
     const amt = Math.min(creditors[ci].amt, debtors[di].amt);
-    transfers.push(`${debtors[di].p} le paga ${fmt(amt)} a ${creditors[ci].p}`);
+    transfers.push({ from: debtors[di].p, to: creditors[ci].p, amt });
     creditors[ci].amt -= amt;
     debtors[di].amt -= amt;
     if (creditors[ci].amt < 0.01) ci++;
@@ -325,10 +334,53 @@ async function loadBalances() {
     transfers.forEach((t) => {
       const row = document.createElement("div");
       row.className = "settle-row";
-      row.textContent = t;
+      const text = document.createElement("span");
+      text.textContent = `${t.from} le paga ${fmt(t.amt)} a ${t.to}`;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "assign-btn";
+      btn.textContent = "Marcar como pagado";
+      btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        await supabase.from("settlements").insert({
+          from_person: t.from, to_person: t.to, amount: t.amt
+        });
+        loadBalances();
+      });
+      row.appendChild(text);
+      row.appendChild(btn);
       settleEl.appendChild(row);
     });
   }
+
+  // Recorded payments (audit trail, with undo)
+  if (paysErr) {
+    paymentsEl.textContent = "";
+    return;
+  }
+  paymentsEl.innerHTML = "";
+  if (!payments || payments.length === 0) {
+    paymentsEl.textContent = "Todavía no se registraron pagos.";
+    return;
+  }
+  payments.forEach((s) => {
+    const row = document.createElement("div");
+    row.className = "settle-row";
+    const text = document.createElement("span");
+    text.textContent = `${s.from_person} le pagó ${fmt(s.amount)} a ${s.to_person}`;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "assign-btn";
+    btn.textContent = "Deshacer";
+    btn.addEventListener("click", async () => {
+      if (!confirm("¿Deshacer este pago?")) return;
+      await supabase.from("settlements").delete().eq("id", s.id);
+      loadBalances();
+    });
+    row.appendChild(text);
+    row.appendChild(btn);
+    paymentsEl.appendChild(row);
+  });
 }
 
 function fmt(n) {

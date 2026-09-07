@@ -25,3 +25,22 @@ with check (true);
 -- Si ya habías corrido este script antes de que existiera la columna
 -- "title", corré sólo esta línea en vez de todo lo de arriba:
 -- alter table public.bills add column if not exists title text;
+
+-- Pagos registrados manualmente ("Marcar como pagado" en la app), para
+-- descontar deudas ya saldadas sin borrar el historial de compras.
+create table public.settlements (
+  id uuid primary key default gen_random_uuid(),
+  from_person text not null,
+  to_person text not null,
+  amount numeric not null,
+  created_at timestamptz not null default now()
+);
+
+alter table public.settlements enable row level security;
+
+create policy "Allow all for authenticated users"
+on public.settlements
+for all
+to authenticated
+using (true)
+with check (true);
