@@ -238,6 +238,15 @@ async function loadHistory() {
     summary.innerHTML = `<span>${label} — pagó ${bill.payer}</span><span>${fmt(bill.total)}</span>`;
     details.appendChild(summary);
 
+    const owed = PEOPLE.filter((p) => p !== bill.payer && bill.shares && bill.shares[p] > 0.009)
+      .map((p) => `${p} le debe ${fmt(bill.shares[p])} a ${bill.payer}`);
+    if (owed.length) {
+      const owedP = document.createElement("p");
+      owedP.className = "hint";
+      owedP.textContent = owed.join(" · ");
+      details.appendChild(owedP);
+    }
+
     const ul = document.createElement("ul");
     (bill.items || []).forEach((i) => {
       const li = document.createElement("li");
