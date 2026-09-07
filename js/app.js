@@ -283,8 +283,7 @@ async function loadHistory() {
 
 // ---------- Balances ----------
 async function loadBalances() {
-  const balEl = document.getElementById("balances-list");
-  const settleEl = document.getElementById("settle-list");
+  const pairEl = document.getElementById("pairwise-list");
   const paymentsEl = document.getElementById("payments-list");
 
   const [{ data: bills, error: billsErr }, { data: payments, error: paysErr }] = await Promise.all([
@@ -293,34 +292,11 @@ async function loadBalances() {
   ]);
 
   if (billsErr) {
-    balEl.textContent = friendlyError(billsErr);
+    pairEl.textContent = friendlyError(billsErr);
     return;
   }
 
-  const balances = Object.fromEntries(PEOPLE.map((p) => [p, 0]));
-  (bills || []).forEach((bill) => {
-    balances[bill.payer] = (balances[bill.payer] || 0) + bill.total;
-    PEOPLE.forEach((p) => {
-      balances[p] -= (bill.shares && bill.shares[p]) || 0;
-    });
-  });
-  (payments || []).forEach((s) => {
-    balances[s.from_person] = (balances[s.from_person] || 0) + s.amount;
-    balances[s.to_person] = (balances[s.to_person] || 0) - s.amount;
-  });
-
-  balEl.innerHTML = "";
-  PEOPLE.forEach((p) => {
-    const row = document.createElement("div");
-    row.className = "balance-row";
-    const sign = balances[p] >= 0 ? "pos" : "neg";
-    const label = balances[p] >= 0 ? "le deben" : "debe";
-    row.innerHTML = `<span>${p}</span><span class="${sign}">${label} ${fmt(Math.abs(balances[p]))}</span>`;
-    balEl.appendChild(row);
-  });
-
-  // Pairwise net debt: ground truth per pair, no group-wide optimization
-  const pairEl = document.getElementById("pairwise-list");
+  // Pairwise net debt: exactly what each pair owes each other, no group-wide optimization
   const net = {};
   function applyDebt(debtor, creditor, amt) {
     if (debtor === creditor || !amt) return;
@@ -368,49 +344,6 @@ async function loadBalances() {
   });
   if (!anyPairDebt) {
     pairEl.textContent = "Todo saldado entre todos.";
-  }
-
-  // Settle-up: greedy match creditors with debtors
-  const creditors = PEOPLE.filter((p) => balances[p] > 0.01)
-    .map((p) => ({ p, amt: balances[p] })).sort((a, b) => b.amt - a.amt);
-  const debtors = PEOPLE.filter((p) => balances[p] < -0.01)
-    .map((p) => ({ p, amt: -balances[p] })).sort((a, b) => b.amt - a.amt);
-
-  settleEl.innerHTML = "";
-  let ci = 0, di = 0;
-  const transfers = [];
-  while (ci < creditors.length && di < debtors.length) {
-    const amt = Math.min(creditors[ci].amt, debtors[di].amt);
-    transfers.push({ from: debtors[di].p, to: creditors[ci].p, amt });
-    creditors[ci].amt -= amt;
-    debtors[di].amt -= amt;
-    if (creditors[ci].amt < 0.01) ci++;
-    if (debtors[di].amt < 0.01) di++;
-  }
-
-  if (transfers.length === 0) {
-    settleEl.textContent = "Todo saldado.";
-  } else {
-    transfers.forEach((t) => {
-      const row = document.createElement("div");
-      row.className = "settle-row";
-      const text = document.createElement("span");
-      text.textContent = `${t.from} le paga ${fmt(t.amt)} a ${t.to}`;
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "assign-btn";
-      btn.textContent = "Marcar como pagado";
-      btn.addEventListener("click", async () => {
-        btn.disabled = true;
-        await supabase.from("settlements").insert({
-          from_person: t.from, to_person: t.to, amount: t.amt
-        });
-        loadBalances();
-      });
-      row.appendChild(text);
-      row.appendChild(btn);
-      settleEl.appendChild(row);
-    });
   }
 
   // Recorded payments (audit trail, with undo)
