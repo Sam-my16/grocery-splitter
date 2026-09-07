@@ -49,3 +49,19 @@ with check (true);
 -- Si ya habías corrido este script antes de que existiera la columna
 -- "category", corré sólo esta línea en vez de todo lo de arriba:
 -- alter table public.bills add column if not exists category text;
+
+-- Si cambiás el nombre de alguna persona en js/supabase-config.js (el
+-- array PEOPLE), corré esto UNA VEZ para que las compras y pagos ya
+-- guardados usen el nombre nuevo (si no, quedan "huérfanos" y no suman
+-- en los balances). Reemplazá 'Nahobe' y 'Nubi' por los nombres que
+-- corresponda.
+-- update public.bills
+-- set payer = replace(payer, 'Nahobe', 'Nubi'),
+--     shares = replace(shares::text, 'Nahobe', 'Nubi')::jsonb,
+--     items = replace(items::text, 'Nahobe', 'Nubi')::jsonb
+-- where payer = 'Nahobe' or shares::text like '%Nahobe%' or items::text like '%Nahobe%';
+--
+-- update public.settlements
+-- set from_person = replace(from_person, 'Nahobe', 'Nubi'),
+--     to_person = replace(to_person, 'Nahobe', 'Nubi')
+-- where from_person = 'Nahobe' or to_person = 'Nahobe';

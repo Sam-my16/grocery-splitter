@@ -304,10 +304,94 @@ async function loadHistory() {
     });
     details.appendChild(ul);
 
+    const actions = document.createElement("div");
+    actions.style.marginTop = "0.5rem";
+    actions.style.display = "flex";
+    actions.style.gap = "0.5rem";
+
+    const editForm = document.createElement("div");
+    editForm.className = "row";
+    editForm.hidden = true;
+
+    const titleLabel = document.createElement("label");
+    titleLabel.textContent = "Título";
+    const titleInput = document.createElement("input");
+    titleInput.type = "text";
+    titleInput.value = bill.title || "";
+    titleLabel.appendChild(titleInput);
+
+    const dateLabel = document.createElement("label");
+    dateLabel.textContent = "Fecha";
+    const dateInput = document.createElement("input");
+    dateInput.type = "date";
+    dateInput.value = bill.date;
+    dateLabel.appendChild(dateInput);
+
+    const payerLabel = document.createElement("label");
+    payerLabel.textContent = "¿Quién pagó?";
+    const payerSelect = document.createElement("select");
+    PEOPLE.forEach((p) => {
+      const opt = document.createElement("option");
+      opt.textContent = p;
+      if (p === bill.payer) opt.selected = true;
+      payerSelect.appendChild(opt);
+    });
+    payerLabel.appendChild(payerSelect);
+
+    const categoryLabel = document.createElement("label");
+    categoryLabel.textContent = "Categoría";
+    const categorySelect = document.createElement("select");
+    ["Supermercado", "Salidas", "Comida"].forEach((c) => {
+      const opt = document.createElement("option");
+      opt.textContent = c;
+      if (c === bill.category) opt.selected = true;
+      categorySelect.appendChild(opt);
+    });
+    categoryLabel.appendChild(categorySelect);
+
+    const saveEditBtn = document.createElement("button");
+    saveEditBtn.type = "button";
+    saveEditBtn.className = "primary";
+    saveEditBtn.textContent = "Guardar cambios";
+    const editStatus = document.createElement("p");
+    editStatus.className = "hint";
+    saveEditBtn.addEventListener("click", async () => {
+      const { error } = await supabase.from("bills").update({
+        title: titleInput.value.trim() || null,
+        date: dateInput.value,
+        payer: payerSelect.value,
+        category: categorySelect.value
+      }).eq("id", bill.id);
+      if (error) {
+        editStatus.textContent = friendlyError(error);
+        return;
+      }
+      loadHistory();
+      loadBalances();
+    });
+
+    editForm.appendChild(titleLabel);
+    editForm.appendChild(dateLabel);
+    editForm.appendChild(payerLabel);
+    editForm.appendChild(categoryLabel);
+    editForm.appendChild(saveEditBtn);
+    editForm.appendChild(editStatus);
+    details.appendChild(editForm);
+
+    const editBtn = document.createElement("button");
+    editBtn.type = "button";
+    editBtn.textContent = "Editar";
+    editBtn.className = "assign-btn";
+    editBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      editForm.hidden = !editForm.hidden;
+    });
+    actions.appendChild(editBtn);
+
     const delBtn = document.createElement("button");
+    delBtn.type = "button";
     delBtn.textContent = "Eliminar";
     delBtn.className = "assign-btn";
-    delBtn.style.marginTop = "0.5rem";
     delBtn.addEventListener("click", async (e) => {
       e.preventDefault();
       if (!confirm("¿Eliminar esta compra?")) return;
@@ -315,7 +399,8 @@ async function loadHistory() {
       loadHistory();
       loadBalances();
     });
-    details.appendChild(delBtn);
+    actions.appendChild(delBtn);
+    details.appendChild(actions);
 
     el.appendChild(details);
   });
@@ -375,7 +460,16 @@ async function loadBalances() {
     btn.textContent = "Marcar como pagado";
     btn.addEventListener("click", async () => {
       btn.disabled = true;
-      await supabase.from("settlements").insert({ from_person: debtor, to_person: creditor, amount: amt });
+      const { error } = await supabase.from("settlements").insert({ from_person: debtor, to_person: creditor, amount: amt });
+      if (error) {
+        const err = document.createElement("p");
+        err.className = "hint";
+        err.style.color = "var(--danger)";
+        err.textContent = friendlyError(error);
+        row.appendChild(err);
+        btn.disabled = false;
+        return;
+      }
       loadBalances();
     });
     row.appendChild(text);

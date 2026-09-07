@@ -1,6 +1,6 @@
 # Cuentas Claras
 
-Sitio estático para dividir los gastos de la casa entre Sammy, Nahobe y
+Sitio estático para dividir los gastos de la casa entre Sammy, Nubi y
 Gabriel. Subís un CSV con los items de la boleta (generado por un agente de
 IA a partir de la foto/lista de la compra), asignás cada item a una o varias
 personas, y la app calcula cuánto le corresponde pagar a cada uno y quién le
@@ -21,7 +21,7 @@ tres vean lo mismo desde cualquier dispositivo.
 
 2. Entrá a la página, pestaña **Nueva compra**, pegá el CSV (o subí el
    archivo) y tocá **Parsear**.
-3. Asigná cada item a Sammy, Nahobe y/o Gabriel (tocá más de uno para
+3. Asigná cada item a Sammy, Nubi y/o Gabriel (tocá más de uno para
    dividirlo entre varios, o usá los botones rápidos "Todos" / de a pares).
 4. Revisá que la suma de items coincida con el total real de la boleta,
    elegí la fecha, quién pagó y la categoría (Supermercado / Salidas /

@@ -5,4 +5,4 @@
 export const SUPABASE_URL = "https://xuydzbzzobeoldkakrzv.supabase.co";
 export const SUPABASE_ANON_KEY = "sb_publishable_Bu7Z469vGsWvk3ssf0jQ5w_3-FueqGV";
 
-export const PEOPLE = ["Sammy", "Nahobe", "Gabriel"];
+export const PEOPLE = ["Sammy", "Nubi", "Gabriel"];
