@@ -8,6 +8,7 @@ create table public.bills (
   items jsonb not null,
   shares jsonb not null,
   title text,
+  category text,
   created_at timestamptz not null default now()
 );
 
@@ -44,3 +45,7 @@ for all
 to authenticated
 using (true)
 with check (true);
+
+-- Si ya habías corrido este script antes de que existiera la columna
+-- "category", corré sólo esta línea en vez de todo lo de arriba:
+-- alter table public.bills add column if not exists category text;

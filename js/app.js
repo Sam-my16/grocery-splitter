@@ -219,9 +219,10 @@ document.getElementById("save-bill-btn").addEventListener("click", async () => {
   const payer = document.getElementById("bill-payer").value;
   const date = document.getElementById("bill-date").value;
   const title = document.getElementById("bill-title").value.trim() || null;
+  const category = document.getElementById("bill-category").value;
 
   const { error } = await supabase.from("bills").insert({
-    date, payer, total, items, shares, title
+    date, payer, total, items, shares, title, category
   });
 
   if (error) {
@@ -236,6 +237,7 @@ document.getElementById("save-bill-btn").addEventListener("click", async () => {
   document.getElementById("save-card").hidden = true;
   document.getElementById("bill-total").value = "";
   document.getElementById("bill-title").value = "";
+  document.getElementById("bill-category").value = "Supermercado";
   loadHistory();
   loadBalances();
 });
@@ -243,6 +245,7 @@ document.getElementById("save-bill-btn").addEventListener("click", async () => {
 // ---------- History ----------
 async function loadHistory() {
   const el = document.getElementById("history-list");
+  const catEl = document.getElementById("category-list");
   const { data: bills, error } = await supabase
     .from("bills")
     .select("*")
@@ -250,19 +253,38 @@ async function loadHistory() {
 
   if (error) {
     el.textContent = friendlyError(error);
+    catEl.textContent = "";
     return;
   }
   if (!bills || bills.length === 0) {
     el.textContent = "Todavía no hay compras cargadas.";
+    catEl.textContent = "Todavía no hay compras cargadas.";
     return;
   }
+
+  const byCategory = {};
+  bills.forEach((bill) => {
+    const cat = bill.category || "Sin categoría";
+    byCategory[cat] = (byCategory[cat] || 0) + bill.total;
+  });
+  catEl.innerHTML = "";
+  Object.entries(byCategory)
+    .sort((a, b) => b[1] - a[1])
+    .forEach(([cat, total]) => {
+      const row = document.createElement("div");
+      row.className = "balance-row";
+      row.innerHTML = `<span>${cat}</span><span>${fmt(total)}</span>`;
+      catEl.appendChild(row);
+    });
+
   el.innerHTML = "";
   bills.forEach((bill) => {
     const details = document.createElement("details");
     details.className = "history-item";
     const label = bill.title ? `${bill.title} (${bill.date})` : bill.date;
+    const categoryTag = bill.category ? ` · ${bill.category}` : "";
     const summary = document.createElement("summary");
-    summary.innerHTML = `<span>${label} — pagó ${bill.payer}</span><span>${fmt(bill.total)}</span>`;
+    summary.innerHTML = `<span>${label} — pagó ${bill.payer}${categoryTag}</span><span>${fmt(bill.total)}</span>`;
     details.appendChild(summary);
 
     const owed = PEOPLE.filter((p) => p !== bill.payer && bill.shares && bill.shares[p] > 0.009)

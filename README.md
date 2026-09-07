@@ -1,10 +1,10 @@
-# Grocery Splitter
+# Cuentas Claras
 
-Sitio estático para dividir las compras del supermercado entre Sammy, Nahobe
-y Gabriel. Subís un CSV con los items de la boleta (generado por un agente de
+Sitio estático para dividir los gastos de la casa entre Sammy, Nahobe y
+Gabriel. Subís un CSV con los items de la boleta (generado por un agente de
 IA a partir de la foto/lista de la compra), asignás cada item a una o varias
 personas, y la app calcula cuánto le corresponde pagar a cada uno y quién le
-debe a quién, mes a mes.
+debe a quién, mes a mes. Se puede instalar como app (PWA) en el celular.
 
 Los datos (boletas, balances) se guardan en Supabase (Postgres) para que los
 tres vean lo mismo desde cualquier dispositivo.
@@ -22,11 +22,14 @@ tres vean lo mismo desde cualquier dispositivo.
 2. Entrá a la página, pestaña **Nueva compra**, pegá el CSV (o subí el
    archivo) y tocá **Parsear**.
 3. Asigná cada item a Sammy, Nahobe y/o Gabriel (tocá más de uno para
-   dividirlo entre varios).
+   dividirlo entre varios, o usá los botones rápidos "Todos" / de a pares).
 4. Revisá que la suma de items coincida con el total real de la boleta,
-   elegí la fecha y quién pagó, y guardá.
-5. En la pestaña **Balances** vas a ver cuánto le debe cada uno a la casa,
-   y sugerencias de transferencias para saldar cuentas.
+   elegí la fecha, quién pagó y la categoría (Supermercado / Salidas /
+   Comida), y guardá.
+5. En la pestaña **Historial** vas a ver el gasto acumulado por categoría y
+   el detalle de cada compra. En **Balances**, cuánto le debe cada uno a
+   cada quien en total, con un botón para marcar como pagado cuando alguien
+   te transfiere.
 
 ## Setup (una sola vez)
 
@@ -52,6 +55,12 @@ tres vean lo mismo desde cualquier dispositivo.
 En el repo: **Settings → Pages → Source: Deploy from a branch → Branch:
 `main` / `(root)` → Save**. Después de un minuto la página va a estar en
 `https://sam-my16.github.io/grocery-splitter/`.
+
+### 4. Instalarla como app (PWA)
+
+Desde el navegador del celular: **Compartir → Agregar a la pantalla de
+inicio** (iOS Safari) o **⋮ → Instalar app** (Android Chrome). Queda con
+ícono propio y abre en pantalla completa, sin la barra del navegador.
 
 ### 3. Personalizar nombres
 
@@ -80,10 +89,9 @@ sincronizado. Solución: **Ajustes → General → Fecha y hora → activar
 
 ## Ideas para más adelante
 
-- Categorías por item (limpieza, almacén, verdulería) y gráficos de gasto
-  por categoría a lo largo del tiempo.
+- Categorías por item (no sólo por compra completa) y gráficos de gasto en
+  el tiempo.
 - Notificación (WhatsApp/email) recordando de quién es el turno de comprar.
-- PWA instalable para que se sienta como una app en el celular.
 - Autocompletar items recurrentes para no tener que asignarlos cada vez.
 - Exportar el resumen mensual a PDF.
 
