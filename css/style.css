@@ -1,5 +1,5 @@
 :root {
-  --bg: #f7f6f3;
+  --bg: #ffffff;
   --card: #ffffff;
   --text: #262421;
   --muted: #6b6660;
@@ -8,18 +8,6 @@
   --border: #e4e1db;
   --danger: #b3441e;
   --ok: #2f7d4f;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #1b1a18;
-    --card: #262421;
-    --text: #ece9e4;
-    --muted: #a19c93;
-    --accent: #4caf7d;
-    --accent-dark: #6fce9c;
-    --border: #3a3733;
-  }
 }
 
 * { box-sizing: border-box; }
