@@ -319,6 +319,57 @@ async function loadBalances() {
     balEl.appendChild(row);
   });
 
+  // Pairwise net debt: ground truth per pair, no group-wide optimization
+  const pairEl = document.getElementById("pairwise-list");
+  const net = {};
+  function applyDebt(debtor, creditor, amt) {
+    if (debtor === creditor || !amt) return;
+    const [a, b] = [debtor, creditor].sort();
+    const sign = debtor === a ? 1 : -1;
+    net[`${a}|${b}`] = (net[`${a}|${b}`] || 0) + sign * amt;
+  }
+  (bills || []).forEach((bill) => {
+    PEOPLE.forEach((p) => {
+      if (p === bill.payer) return;
+      applyDebt(p, bill.payer, (bill.shares && bill.shares[p]) || 0);
+    });
+  });
+  (payments || []).forEach((s) => {
+    applyDebt(s.to_person, s.from_person, s.amount);
+  });
+
+  pairEl.innerHTML = "";
+  let anyPairDebt = false;
+  pairCombos(PEOPLE).forEach(([a, b]) => {
+    const [sortedA, sortedB] = [a, b].sort();
+    const value = net[`${sortedA}|${sortedB}`] || 0;
+    if (Math.abs(value) < 0.01) return;
+    anyPairDebt = true;
+    const debtor = value > 0 ? sortedA : sortedB;
+    const creditor = value > 0 ? sortedB : sortedA;
+    const amt = Math.abs(value);
+
+    const row = document.createElement("div");
+    row.className = "settle-row";
+    const text = document.createElement("span");
+    text.textContent = `${debtor} le debe ${fmt(amt)} a ${creditor}`;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "assign-btn";
+    btn.textContent = "Marcar como pagado";
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      await supabase.from("settlements").insert({ from_person: debtor, to_person: creditor, amount: amt });
+      loadBalances();
+    });
+    row.appendChild(text);
+    row.appendChild(btn);
+    pairEl.appendChild(row);
+  });
+  if (!anyPairDebt) {
+    pairEl.textContent = "Todo saldado entre todos.";
+  }
+
   // Settle-up: greedy match creditors with debtors
   const creditors = PEOPLE.filter((p) => balances[p] > 0.01)
     .map((p) => ({ p, amt: balances[p] })).sort((a, b) => b.amt - a.amt);
