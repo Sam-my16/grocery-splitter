@@ -70,16 +70,34 @@ document.getElementById("csv-file").addEventListener("change", (e) => {
 document.getElementById("parse-btn").addEventListener("click", () => {
   const raw = document.getElementById("csv-input").value.trim();
   if (!raw) return;
-  const result = Papa.parse(raw, { header: true, skipEmptyLines: true });
-  const fields = result.meta.fields || [];
-  const itemKey = fields.find((f) => /item|producto|nombre/i.test(f)) || fields[0];
-  const priceKey = fields.find((f) => /price|precio|final|total/i.test(f)) || fields[1];
 
-  items = result.data
-    .filter((row) => row[itemKey])
+  const rows = Papa.parse(raw, { skipEmptyLines: true }).data;
+  if (!rows || rows.length === 0) return;
+
+  // Con una sola línea no hay forma de tener encabezado + dato: es un item suelto.
+  // Con varias líneas, un encabezado real tiene texto (no un número) en la 2da columna.
+  const secondCell = rows[0][1];
+  const looksLikeHeader = rows.length > 1 &&
+    isNaN(parseFloat(String(secondCell ?? "").replace(",", ".")));
+
+  let dataRows = rows;
+  let itemIdx = 0;
+  let priceIdx = 1;
+
+  if (looksLikeHeader) {
+    const header = rows[0].map((h) => String(h).trim());
+    const foundItem = header.findIndex((f) => /item|producto|nombre/i.test(f));
+    const foundPrice = header.findIndex((f) => /price|precio|final|total/i.test(f));
+    if (foundItem !== -1) itemIdx = foundItem;
+    if (foundPrice !== -1) priceIdx = foundPrice;
+    dataRows = rows.slice(1);
+  }
+
+  items = dataRows
+    .filter((row) => row[itemIdx])
     .map((row) => ({
-      name: row[itemKey].trim(),
-      price: parseFloat(String(row[priceKey]).replace(",", ".")) || 0,
+      name: String(row[itemIdx]).trim(),
+      price: parseFloat(String(row[priceIdx]).replace(",", ".")) || 0,
       assignedTo: []
     }));
 

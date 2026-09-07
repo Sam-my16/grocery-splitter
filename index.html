@@ -23,7 +23,7 @@
   <section id="new-bill" class="tab-panel active">
     <div class="card">
       <h2>1. Pegá o subí el CSV</h2>
-      <p class="hint">Pedile al agente (Claude, Gemini, etc.) que te devuelva un CSV con columnas <code>item,price</code> donde <code>price</code> ya tenga el descuento aplicado. Pegalo abajo o subí el archivo.</p>
+      <p class="hint">Pedile al agente (Claude, Gemini, etc.) que te devuelva un CSV con columnas <code>item,price</code> donde <code>price</code> ya tenga el descuento aplicado. Pegalo abajo o subí el archivo. Para cargar un solo item a mano no hace falta la fila de encabezado: alcanza con una línea tipo <code>Leche,1200</code>.</p>
       <textarea id="csv-input" rows="6" placeholder="item,price&#10;Leche,1200&#10;Pan,900&#10;..."></textarea>
       <div class="row">
         <input type="file" id="csv-file" accept=".csv,text/csv">
@@ -90,6 +90,6 @@
 </main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-<script type="module" src="js/app.js?v=7"></script>
+<script type="module" src="js/app.js?v=8"></script>
 </body>
 </html>
