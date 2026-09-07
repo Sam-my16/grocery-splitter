@@ -175,6 +175,16 @@ th, td {
   color: white;
 }
 
+.quick-group {
+  margin-bottom: 0.3rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px dashed var(--border);
+}
+
+.assign-btn.quick-btn {
+  font-style: italic;
+}
+
 .totals {
   justify-content: space-between;
   border-top: 1px solid var(--border);

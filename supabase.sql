@@ -1,4 +1,4 @@
--- Corré esto en Supabase: Project -> SQL Editor -> New query -> pegar y Run.
+-- Instalación nueva: Project -> SQL Editor -> New query -> pegar todo esto -> Run.
 
 create table public.bills (
   id uuid primary key default gen_random_uuid(),
@@ -7,6 +7,7 @@ create table public.bills (
   total numeric not null,
   items jsonb not null,
   shares jsonb not null,
+  title text,
   created_at timestamptz not null default now()
 );
 
@@ -20,3 +21,7 @@ for all
 to authenticated
 using (true)
 with check (true);
+
+-- Si ya habías corrido este script antes de que existiera la columna
+-- "title", corré sólo esta línea en vez de todo lo de arriba:
+-- alter table public.bills add column if not exists title text;

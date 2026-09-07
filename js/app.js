@@ -34,6 +34,20 @@ document.querySelectorAll(".tab-btn").forEach((btn) => {
 // ---------- CSV parsing ----------
 let items = []; // { name, price, assignedTo: [] }
 
+function sameSet(a, b) {
+  return a.length === b.length && a.every((x) => b.includes(x));
+}
+
+function pairCombos(arr) {
+  const res = [];
+  for (let i = 0; i < arr.length; i++) {
+    for (let j = i + 1; j < arr.length; j++) {
+      res.push([arr[i], arr[j]]);
+    }
+  }
+  return res;
+}
+
 document.getElementById("csv-file").addEventListener("change", (e) => {
   const file = e.target.files[0];
   if (!file) return;
@@ -79,6 +93,35 @@ function renderItems() {
     priceTd.textContent = fmt(item.price);
 
     const assignTd = document.createElement("td");
+
+    const quickGroup = document.createElement("div");
+    quickGroup.className = "assign-group quick-group";
+
+    const allBtn = document.createElement("button");
+    allBtn.type = "button";
+    allBtn.className = "assign-btn quick-btn" + (sameSet(item.assignedTo, PEOPLE) ? " selected" : "");
+    allBtn.textContent = "Todos";
+    allBtn.addEventListener("click", () => {
+      item.assignedTo = [...PEOPLE];
+      renderItems();
+      updateTotals();
+    });
+    quickGroup.appendChild(allBtn);
+
+    pairCombos(PEOPLE).forEach(([a, b]) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "assign-btn quick-btn" + (sameSet(item.assignedTo, [a, b]) ? " selected" : "");
+      btn.textContent = `${a} + ${b}`;
+      btn.addEventListener("click", () => {
+        item.assignedTo = [a, b];
+        renderItems();
+        updateTotals();
+      });
+      quickGroup.appendChild(btn);
+    });
+    assignTd.appendChild(quickGroup);
+
     const group = document.createElement("div");
     group.className = "assign-group";
     PEOPLE.forEach((person) => {
@@ -148,9 +191,10 @@ document.getElementById("save-bill-btn").addEventListener("click", async () => {
   const total = parseFloat(document.getElementById("bill-total").value) || 0;
   const payer = document.getElementById("bill-payer").value;
   const date = document.getElementById("bill-date").value;
+  const title = document.getElementById("bill-title").value.trim() || null;
 
   const { error } = await supabase.from("bills").insert({
-    date, payer, total, items, shares
+    date, payer, total, items, shares, title
   });
 
   if (error) {
@@ -164,6 +208,7 @@ document.getElementById("save-bill-btn").addEventListener("click", async () => {
   document.getElementById("items-card").hidden = true;
   document.getElementById("save-card").hidden = true;
   document.getElementById("bill-total").value = "";
+  document.getElementById("bill-title").value = "";
   loadHistory();
   loadBalances();
 });
@@ -188,8 +233,9 @@ async function loadHistory() {
   bills.forEach((bill) => {
     const details = document.createElement("details");
     details.className = "history-item";
+    const label = bill.title ? `${bill.title} (${bill.date})` : bill.date;
     const summary = document.createElement("summary");
-    summary.innerHTML = `<span>${bill.date} — pagó ${bill.payer}</span><span>${fmt(bill.total)}</span>`;
+    summary.innerHTML = `<span>${label} — pagó ${bill.payer}</span><span>${fmt(bill.total)}</span>`;
     details.appendChild(summary);
 
     const ul = document.createElement("ul");
