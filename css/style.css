@@ -1,13 +1,31 @@
 :root {
-  --bg: #ffffff;
+  --bg: #eeece5;
   --card: #ffffff;
+  --chip-bg: #eeece5;
+  --th-bg: #e6e3d9;
   --text: #262421;
   --muted: #6b6660;
   --accent: #2f7d4f;
   --accent-dark: #235f3c;
-  --border: #e4e1db;
+  --border: #d3cec2;
   --danger: #b3441e;
   --ok: #2f7d4f;
+  --shadow: rgba(38, 36, 33, 0.08);
+}
+
+:root[data-theme="dark"] {
+  --bg: #15171a;
+  --card: #212428;
+  --chip-bg: #2b2e33;
+  --th-bg: #2b2e33;
+  --text: #edece8;
+  --muted: #a4a099;
+  --accent: #48b37e;
+  --accent-dark: #6fce9c;
+  --border: #3a3e44;
+  --danger: #e2775a;
+  --ok: #48b37e;
+  --shadow: rgba(0, 0, 0, 0.4);
 }
 
 * { box-sizing: border-box; }
@@ -28,9 +46,28 @@ body {
   z-index: 10;
 }
 
+.topbar-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
 .topbar h1 {
-  margin: 0 0 0.75rem 0;
+  margin: 0;
   font-size: 1.25rem;
+}
+
+.theme-toggle-btn {
+  background: var(--chip-bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.35rem 0.8rem;
+  font-size: 0.85rem;
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
 }
 
 .tabs {
@@ -40,7 +77,7 @@ body {
 }
 
 .tab-btn {
-  background: none;
+  background: var(--chip-bg);
   border: 1px solid var(--border);
   border-radius: 999px;
   padding: 0.4rem 1rem;
@@ -77,11 +114,14 @@ main {
   border-radius: 12px;
   padding: 1.25rem;
   margin-bottom: 1rem;
+  box-shadow: 0 1px 3px var(--shadow);
 }
 
 .card h2 {
-  margin-top: 0;
+  margin: 0 0 0.75rem 0;
+  padding-bottom: 0.6rem;
   font-size: 1.05rem;
+  border-bottom: 1px solid var(--border);
 }
 
 .hint {
@@ -137,8 +177,17 @@ table {
 
 th, td {
   text-align: left;
-  padding: 0.4rem 0.3rem;
+  padding: 0.5rem 0.5rem;
   border-bottom: 1px solid var(--border);
+}
+
+thead th {
+  background: var(--th-bg);
+  font-weight: 600;
+}
+
+tbody tr:nth-child(even) {
+  background: var(--chip-bg);
 }
 
 .assign-group {
@@ -185,8 +234,8 @@ th, td {
   font-size: 0.8rem;
 }
 
-.badge.ok { background: rgba(47,125,79,0.15); color: var(--ok); }
-.badge.bad { background: rgba(179,68,30,0.15); color: var(--danger); }
+.badge.ok { background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); }
+.badge.bad { background: color-mix(in srgb, var(--danger) 18%, transparent); color: var(--danger); }
 
 .month-header {
   margin: 1rem 0 0.25rem 0;

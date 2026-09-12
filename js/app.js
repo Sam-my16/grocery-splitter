@@ -30,6 +30,22 @@ function friendlyError(error) {
   loadBalances();
 })();
 
+// ---------- Theme ----------
+const themeToggleBtn = document.getElementById("theme-toggle");
+
+function setThemeLabel(theme) {
+  themeToggleBtn.textContent = theme === "dark" ? "☀️ Claro" : "🌙 Oscuro";
+}
+
+setThemeLabel(document.documentElement.getAttribute("data-theme"));
+
+themeToggleBtn.addEventListener("click", () => {
+  const next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", next);
+  localStorage.setItem("cc-theme", next);
+  setThemeLabel(next);
+});
+
 // ---------- Tabs ----------
 document.querySelectorAll(".tab-btn").forEach((btn) => {
   btn.addEventListener("click", () => {
