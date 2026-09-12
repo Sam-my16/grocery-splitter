@@ -20,7 +20,7 @@ tres vean lo mismo desde cualquier dispositivo.
    > total de la boleta.
 
 2. Entrá a la página, pestaña **Nueva compra**, pegá el CSV (o subí el
-   archivo) y tocá **Parsear**.
+   archivo) y tocá **Registrar**.
 3. Asigná cada item a Sammy, Nubi y/o Gabriel (tocá más de uno para
    dividirlo entre varios, o usá los botones rápidos "Todos" / de a pares).
 4. Revisá que la suma de items coincida con el total real de la boleta,
