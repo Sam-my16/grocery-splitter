@@ -1,16 +1,16 @@
 :root {
-  --bg: #eeece5;
+  --bg: #eef1f3;
   --card: #ffffff;
-  --chip-bg: #eeece5;
-  --th-bg: #e6e3d9;
-  --text: #262421;
-  --muted: #6b6660;
+  --chip-bg: #eef1f3;
+  --th-bg: #e3e7ea;
+  --text: #20242a;
+  --muted: #667080;
   --accent: #2f7d4f;
   --accent-dark: #235f3c;
-  --border: #d3cec2;
+  --border: #d7dde1;
   --danger: #b3441e;
   --ok: #2f7d4f;
-  --shadow: rgba(38, 36, 33, 0.08);
+  --shadow: rgba(20, 24, 28, 0.08);
 }
 
 :root[data-theme="dark"] {
