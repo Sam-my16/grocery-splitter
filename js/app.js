@@ -427,6 +427,48 @@ async function loadHistory() {
 
     monthGroupEl.appendChild(details);
   });
+
+  makeCollapsible(el, {
+    itemSelector: ".history-item",
+    groupSelector: ".month-group",
+    headerSelector: ".month-header",
+    visibleCount: 2,
+    moreLabel: "Mostrar todas las compras",
+    lessLabel: "Mostrar menos"
+  });
+}
+
+function makeCollapsible(container, { itemSelector, groupSelector, headerSelector, visibleCount, moreLabel, lessLabel }) {
+  const items = Array.from(container.querySelectorAll(itemSelector));
+  if (items.length <= visibleCount) return;
+
+  let expanded = false;
+  const toggleBtn = document.createElement("button");
+  toggleBtn.type = "button";
+  toggleBtn.className = "assign-btn toggle-list-btn";
+
+  function render() {
+    items.forEach((item, idx) => {
+      item.hidden = !expanded && idx >= visibleCount;
+    });
+    if (groupSelector && headerSelector) {
+      container.querySelectorAll(groupSelector).forEach((group) => {
+        const header = group.previousElementSibling;
+        if (!header || !header.matches(headerSelector)) return;
+        const hasVisible = Array.from(group.children).some((c) => !c.hidden);
+        header.hidden = !hasVisible;
+      });
+    }
+    toggleBtn.textContent = expanded ? lessLabel : `${moreLabel} (${items.length - visibleCount})`;
+  }
+
+  toggleBtn.addEventListener("click", () => {
+    expanded = !expanded;
+    render();
+  });
+
+  render();
+  container.appendChild(toggleBtn);
 }
 
 function monthLabel(dateStr) {
@@ -571,6 +613,13 @@ async function loadBalances() {
     row.appendChild(text);
     row.appendChild(btn);
     paymentsEl.appendChild(row);
+  });
+
+  makeCollapsible(paymentsEl, {
+    itemSelector: ".settle-row",
+    visibleCount: 2,
+    moreLabel: "Mostrar todos los pagos",
+    lessLabel: "Mostrar menos"
   });
 }
 

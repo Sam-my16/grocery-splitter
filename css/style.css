@@ -242,3 +242,7 @@ th, td {
 .settle-row:last-child {
   border-bottom: none;
 }
+
+.toggle-list-btn {
+  margin-top: 0.75rem;
+}
