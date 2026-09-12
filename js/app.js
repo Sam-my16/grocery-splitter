@@ -265,12 +265,18 @@ async function loadHistory() {
     return;
   }
 
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const billsThisMonth = bills.filter((bill) => bill.date.slice(0, 7) === currentMonth);
+
   const byCategory = {};
-  bills.forEach((bill) => {
+  billsThisMonth.forEach((bill) => {
     const cat = bill.category || "Sin categoría";
     byCategory[cat] = (byCategory[cat] || 0) + bill.total;
   });
   catEl.innerHTML = "";
+  if (billsThisMonth.length === 0) {
+    catEl.textContent = "Todavía no hay compras este mes.";
+  }
   Object.entries(byCategory)
     .sort((a, b) => b[1] - a[1])
     .forEach(([cat, total]) => {
