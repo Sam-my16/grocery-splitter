@@ -10,7 +10,7 @@
 <meta name="theme-color" content="#2f7d4f">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Cuentas Claras">
-<link rel="stylesheet" href="css/style.css?v=5">
+<link rel="stylesheet" href="css/style.css?v=6">
 </head>
 <body>
 <header class="topbar">
@@ -100,14 +100,17 @@
       <div id="pairwise-list">Cargando...</div>
     </div>
     <div class="card">
-      <h2>Pagos registrados</h2>
+      <div class="row" style="justify-content: space-between; margin-top: 0;">
+        <h2>Pagos registrados</h2>
+        <button id="clear-payments-btn" class="assign-btn">Eliminar todos</button>
+      </div>
       <div id="payments-list">Cargando...</div>
     </div>
   </section>
 </main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-<script type="module" src="js/app.js?v=10"></script>
+<script type="module" src="js/app.js?v=11"></script>
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => navigator.serviceWorker.register("sw.js"));

@@ -278,7 +278,21 @@ async function loadHistory() {
     });
 
   el.innerHTML = "";
+  let currentMonthKey = null;
+  let monthGroupEl = null;
   bills.forEach((bill) => {
+    const monthKey = bill.date.slice(0, 7);
+    if (monthKey !== currentMonthKey) {
+      currentMonthKey = monthKey;
+      const header = document.createElement("h3");
+      header.className = "month-header";
+      header.textContent = monthLabel(bill.date);
+      el.appendChild(header);
+      monthGroupEl = document.createElement("div");
+      monthGroupEl.className = "month-group";
+      el.appendChild(monthGroupEl);
+    }
+
     const details = document.createElement("details");
     details.className = "history-item";
     const label = bill.title ? `${bill.title} (${bill.date})` : bill.date;
@@ -402,9 +416,21 @@ async function loadHistory() {
     actions.appendChild(delBtn);
     details.appendChild(actions);
 
-    el.appendChild(details);
+    monthGroupEl.appendChild(details);
   });
 }
+
+function monthLabel(dateStr) {
+  const d = new Date(dateStr + "T00:00:00");
+  const label = d.toLocaleDateString("es-AR", { month: "long", year: "numeric" });
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+document.getElementById("clear-payments-btn").addEventListener("click", async () => {
+  if (!confirm("¿Eliminar todos los pagos registrados? Esta acción no se puede deshacer.")) return;
+  await supabase.from("settlements").delete().not("id", "is", null);
+  loadBalances();
+});
 
 // ---------- Balances ----------
 async function loadBalances() {

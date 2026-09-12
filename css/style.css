@@ -188,6 +188,18 @@ th, td {
 .badge.ok { background: rgba(47,125,79,0.15); color: var(--ok); }
 .badge.bad { background: rgba(179,68,30,0.15); color: var(--danger); }
 
+.month-header {
+  margin: 1rem 0 0.25rem 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.month-header:first-child {
+  margin-top: 0;
+}
+
 .history-item {
   border-bottom: 1px solid var(--border);
   padding: 0.6rem 0;
