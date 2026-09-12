@@ -88,7 +88,10 @@
       <div id="category-list">Cargando...</div>
     </div>
     <div class="card">
-      <h2>Compras anteriores</h2>
+      <div class="row" style="justify-content: space-between; margin-top: 0;">
+        <h2>Compras anteriores</h2>
+        <button id="export-csv-btn" class="assign-btn">Exportar CSV</button>
+      </div>
       <div id="history-list">Cargando...</div>
     </div>
   </section>
@@ -110,7 +113,7 @@
 </main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-<script type="module" src="js/app.js?v=11"></script>
+<script type="module" src="js/app.js?v=12"></script>
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => navigator.serviceWorker.register("sw.js"));

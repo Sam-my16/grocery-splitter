@@ -243,6 +243,8 @@ document.getElementById("save-bill-btn").addEventListener("click", async () => {
 });
 
 // ---------- History ----------
+let historyBills = [];
+
 async function loadHistory() {
   const el = document.getElementById("history-list");
   const catEl = document.getElementById("category-list");
@@ -256,6 +258,7 @@ async function loadHistory() {
     catEl.textContent = "";
     return;
   }
+  historyBills = bills || [];
   if (!bills || bills.length === 0) {
     el.textContent = "Todavía no hay compras cargadas.";
     catEl.textContent = "Todavía no hay compras cargadas.";
@@ -425,6 +428,35 @@ function monthLabel(dateStr) {
   const label = d.toLocaleDateString("es-AR", { month: "long", year: "numeric" });
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
+
+function csvEscape(value) {
+  const s = String(value ?? "");
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+document.getElementById("export-csv-btn").addEventListener("click", () => {
+  if (historyBills.length === 0) return;
+
+  const headers = ["fecha", "mes", "titulo", "categoria", "pago", ...PEOPLE.map((p) => `parte_${p}`)];
+  const rows = historyBills.map((bill) => [
+    bill.date,
+    bill.date.slice(0, 7),
+    bill.title || "",
+    bill.category || "",
+    bill.payer,
+    bill.total,
+    ...PEOPLE.map((p) => (bill.shares && bill.shares[p] ? bill.shares[p].toFixed(2) : "0"))
+  ]);
+
+  const csv = [headers, ...rows].map((r) => r.map(csvEscape).join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `gastos_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
 
 document.getElementById("clear-payments-btn").addEventListener("click", async () => {
   if (!confirm("¿Eliminar todos los pagos registrados? Esta acción no se puede deshacer.")) return;
