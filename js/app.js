@@ -30,6 +30,48 @@ function friendlyError(error) {
   loadBalances();
 })();
 
+// ---------- Person colors ----------
+const PERSON_PALETTE = ["oklch(68% 0.17 45)", "oklch(62% 0.17 310)", "oklch(62% 0.15 230)", "oklch(62% 0.16 190)"];
+const PERSON_VAR = { Sammy: "--sammy", Nubi: "--nubi", Gabriel: "--gabriel" };
+let personColorIdx = JSON.parse(localStorage.getItem("cc-person-colors") || "null") || { Sammy: 0, Nubi: 1, Gabriel: 2 };
+
+function applyPersonColors() {
+  PEOPLE.forEach((p) => {
+    document.documentElement.style.setProperty(PERSON_VAR[p], PERSON_PALETTE[personColorIdx[p]]);
+  });
+}
+applyPersonColors();
+
+document.querySelectorAll(".avatar").forEach((el) => {
+  const person = PEOPLE.find((p) => el.classList.contains("person-" + p.toLowerCase()));
+  if (!person) return;
+  el.addEventListener("click", (e) => {
+    e.stopPropagation();
+    document.querySelectorAll(".color-picker").forEach((p) => p.remove());
+    const picker = document.createElement("div");
+    picker.className = "color-picker";
+    const taken = PEOPLE.filter((p) => p !== person).map((p) => personColorIdx[p]);
+    PERSON_PALETTE.forEach((color, idx) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.style.background = color;
+      if (taken.includes(idx)) btn.classList.add("taken");
+      if (idx === personColorIdx[person]) btn.classList.add("current");
+      btn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        if (taken.includes(idx)) return;
+        personColorIdx = { ...personColorIdx, [person]: idx };
+        localStorage.setItem("cc-person-colors", JSON.stringify(personColorIdx));
+        applyPersonColors();
+        picker.remove();
+      });
+      picker.appendChild(btn);
+    });
+    el.appendChild(picker);
+  });
+});
+document.addEventListener("click", () => document.querySelectorAll(".color-picker").forEach((p) => p.remove()));
+
 // ---------- Theme ----------
 const themeToggleBtn = document.getElementById("theme-toggle");
 
@@ -71,6 +113,10 @@ function pairCombos(arr) {
     }
   }
   return res;
+}
+
+function catClass(cat) {
+  return "cat-" + String(cat || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-");
 }
 
 document.getElementById("csv-file").addEventListener("change", (e) => {
@@ -170,7 +216,7 @@ function renderItems() {
     PEOPLE.forEach((person) => {
       const b = document.createElement("button");
       b.type = "button";
-      b.className = "assign-btn" + (item.assignedTo.includes(person) ? " selected" : "");
+      b.className = "assign-btn person-" + person.toLowerCase() + (item.assignedTo.includes(person) ? " selected" : "");
       b.textContent = person;
       b.addEventListener("click", () => {
         const i = item.assignedTo.indexOf(person);
@@ -293,12 +339,15 @@ async function loadHistory() {
   if (billsThisMonth.length === 0) {
     catEl.textContent = "Todavía no hay compras este mes.";
   }
+  const maxCat = Math.max(1, ...Object.values(byCategory));
   Object.entries(byCategory)
     .sort((a, b) => b[1] - a[1])
     .forEach(([cat, total]) => {
       const row = document.createElement("div");
-      row.className = "balance-row";
-      row.innerHTML = `<span>${cat}</span><span>${fmt(total)}</span>`;
+      row.style.marginBottom = "0.75rem";
+      const pct = Math.round((total / maxCat) * 100);
+      row.innerHTML = `<div class="balance-row" style="border-bottom:none;padding-bottom:0;"><span>${cat}</span><span>${fmt(total)}</span></div>` +
+        `<div class="cat-bar-track"><div class="cat-bar-fill ${catClass(cat)}" style="width:${pct}%"></div></div>`;
       catEl.appendChild(row);
     });
 
@@ -321,9 +370,9 @@ async function loadHistory() {
     const details = document.createElement("details");
     details.className = "history-item";
     const label = bill.title ? `${bill.title} (${bill.date})` : bill.date;
-    const categoryTag = bill.category ? ` · ${bill.category}` : "";
+    const categoryTag = bill.category ? `<span class="cat-tag ${catClass(bill.category)}">${bill.category}</span> ` : "";
     const summary = document.createElement("summary");
-    summary.innerHTML = `<span>${label} — pagó ${bill.payer}${categoryTag}</span><span>${fmt(bill.total)}</span>`;
+    summary.innerHTML = `<span>${categoryTag}${label} — pagó ${bill.payer}</span><span>${fmt(bill.total)}</span>`;
     details.appendChild(summary);
 
     const owed = PEOPLE.filter((p) => p !== bill.payer && bill.shares && bill.shares[p] > 0.009)

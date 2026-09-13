@@ -7,10 +7,12 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<meta name="theme-color" content="#2f7d4f">
+<meta name="theme-color" content="#1f8a52">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Cuentas Claras">
-<link rel="stylesheet" href="css/style.css?v=9">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700;800&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css?v=12">
 <script>
   (function () {
     var stored = localStorage.getItem("cc-theme");
@@ -25,6 +27,11 @@
     <h1>Cuentas Claras</h1>
     <button type="button" id="theme-toggle" class="theme-toggle-btn"></button>
   </div>
+  <div class="avatars">
+    <span class="avatar person-sammy">S</span>
+    <span class="avatar person-nubi">N</span>
+    <span class="avatar person-gabriel">G</span>
+  </div>
   <nav class="tabs">
     <button class="tab-btn active" data-tab="new-bill">Nueva compra</button>
     <button class="tab-btn" data-tab="history">Historial</button>
@@ -38,7 +45,7 @@
   <!-- NEW BILL TAB -->
   <section id="new-bill" class="tab-panel active">
     <div class="card">
-      <h2>1. Pegá o subí el CSV</h2>
+      <div class="card-head"><span class="step-badge step-1">Paso 1</span><h2>Pegá o subí el CSV</h2></div>
       <p class="hint">Pedile al agente (Claude, Gemini, etc.) que te devuelva un CSV con columnas <code>item,price</code> donde <code>price</code> ya tenga el descuento aplicado. Pegalo abajo o subí el archivo. Para cargar un solo item a mano no hace falta la fila de encabezado: alcanza con una línea tipo <code>Leche,1200</code>.</p>
       <textarea id="csv-input" rows="6" placeholder="item,price&#10;Leche,1200&#10;Pan,900&#10;..."></textarea>
       <div class="row">
@@ -48,7 +55,7 @@
     </div>
 
     <div class="card" id="items-card" hidden>
-      <h2>2. Asigná cada item</h2>
+      <div class="card-head"><span class="step-badge step-2">Paso 2</span><h2>Asigná cada item</h2></div>
       <table id="items-table">
         <thead>
           <tr><th>Item</th><th>Precio</th><th>Asignar a</th></tr>
@@ -63,7 +70,7 @@
     </div>
 
     <div class="card" id="save-card" hidden>
-      <h2>3. Guardar</h2>
+      <div class="card-head"><span class="step-badge step-3">Paso 3</span><h2>Guardar</h2></div>
       <div class="row">
         <label>Título (opcional)
           <input type="text" id="bill-title" placeholder="Ej: Compra grande del mes">
@@ -123,7 +130,7 @@
 </main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-<script type="module" src="js/app.js?v=15"></script>
+<script type="module" src="js/app.js?v=18"></script>
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => navigator.serviceWorker.register("sw.js"));
