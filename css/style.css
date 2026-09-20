@@ -263,6 +263,10 @@ textarea, input, select {
   margin-top: 0.75rem;
 }
 
+.row[hidden] {
+  display: none;
+}
+
 .row label {
   display: flex;
   flex-direction: column;
