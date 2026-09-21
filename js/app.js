@@ -98,6 +98,32 @@ document.querySelectorAll(".tab-btn").forEach((btn) => {
   });
 });
 
+// ---------- AI prompt helper ----------
+const INVOICE_PROMPT = `Tengo la foto/PDF de una factura de supermercado. Extraé cada producto
+y devolvé SOLO un CSV con dos columnas: item,price
+
+Reglas:
+- Encabezado exacto: item,price
+- Una fila por producto (usá el nombre tal como aparece, sin abreviar de más)
+- price = precio final de ese producto YA con descuentos, promociones
+  o cupones aplicados (no el precio de lista si hubo descuento)
+- Usá punto como separador decimal, sin símbolo de moneda ni miles
+- No incluyas impuestos, envío ni el total como una fila más
+- Devolvé el CSV directamente en el chat, como texto (en un bloque de código),
+  NO como un archivo para descargar
+- No agregues texto extra ni explicaciones, solo el CSV`;
+
+document.getElementById("copy-prompt-btn").addEventListener("click", async () => {
+  const status = document.getElementById("copy-prompt-status");
+  try {
+    await navigator.clipboard.writeText(INVOICE_PROMPT);
+    status.textContent = "Copiado ✓";
+  } catch {
+    status.textContent = "No se pudo copiar. Copialo manualmente.";
+  }
+  setTimeout(() => { status.textContent = ""; }, 3000);
+});
+
 // ---------- CSV parsing ----------
 let items = []; // { name, price, assignedTo: [] }
 
