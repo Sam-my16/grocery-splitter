@@ -463,6 +463,124 @@ async function loadHistory() {
     });
     categoryLabel.appendChild(categorySelect);
 
+    // -- Items editing --
+    const editItems = (bill.items || []).map((i) => ({
+      name: i.name,
+      price: i.price,
+      assignedTo: [...(i.assignedTo || [])]
+    }));
+
+    const itemsWrap = document.createElement("div");
+    itemsWrap.style.width = "100%";
+    const itemsTable = document.createElement("table");
+    itemsTable.innerHTML = "<thead><tr><th>Item</th><th>Precio</th><th>Asignar a</th><th></th></tr></thead>";
+    const itemsTbody = document.createElement("tbody");
+    itemsTable.appendChild(itemsTbody);
+    itemsWrap.appendChild(itemsTable);
+
+    const addItemBtn = document.createElement("button");
+    addItemBtn.type = "button";
+    addItemBtn.className = "assign-btn";
+    addItemBtn.textContent = "+ Agregar item";
+    addItemBtn.addEventListener("click", () => {
+      editItems.push({ name: "", price: 0, assignedTo: [] });
+      renderEditItems();
+    });
+
+    const editTotalsRow = document.createElement("div");
+    editTotalsRow.className = "row totals";
+    editTotalsRow.style.width = "100%";
+    const editSumEl = document.createElement("span");
+    const editTotalLabel = document.createElement("label");
+    editTotalLabel.textContent = "Total de la boleta";
+    const editTotalInput = document.createElement("input");
+    editTotalInput.type = "number";
+    editTotalInput.step = "0.01";
+    editTotalInput.value = bill.total;
+    editTotalLabel.appendChild(editTotalInput);
+    const editMatchBadge = document.createElement("span");
+    editMatchBadge.className = "badge";
+    editTotalsRow.appendChild(editSumEl);
+    editTotalsRow.appendChild(editTotalLabel);
+    editTotalsRow.appendChild(editMatchBadge);
+
+    function checkEditMatch() {
+      const sum = editItems.reduce((s, i) => s + (parseFloat(i.price) || 0), 0);
+      const total = parseFloat(editTotalInput.value) || 0;
+      const diff = Math.abs(sum - total);
+      editSumEl.textContent = `Suma de items: ${fmt(sum)}`;
+      if (diff < 0.01) {
+        editMatchBadge.textContent = "Coincide";
+        editMatchBadge.className = "badge ok";
+      } else {
+        editMatchBadge.textContent = `Diferencia: ${fmt(diff)}`;
+        editMatchBadge.className = "badge bad";
+      }
+    }
+    editTotalInput.addEventListener("input", checkEditMatch);
+
+    function renderEditItems() {
+      itemsTbody.innerHTML = "";
+      editItems.forEach((item, idx) => {
+        const tr = document.createElement("tr");
+
+        const nameTd = document.createElement("td");
+        const nameInput = document.createElement("input");
+        nameInput.type = "text";
+        nameInput.value = item.name;
+        nameInput.addEventListener("input", () => { item.name = nameInput.value; });
+        nameTd.appendChild(nameInput);
+
+        const priceTd = document.createElement("td");
+        const priceInput = document.createElement("input");
+        priceInput.type = "number";
+        priceInput.step = "0.01";
+        priceInput.value = item.price;
+        priceInput.addEventListener("input", () => {
+          item.price = parseFloat(priceInput.value) || 0;
+          checkEditMatch();
+        });
+        priceTd.appendChild(priceInput);
+
+        const assignTd = document.createElement("td");
+        const group = document.createElement("div");
+        group.className = "assign-group";
+        PEOPLE.forEach((person) => {
+          const b = document.createElement("button");
+          b.type = "button";
+          b.className = "assign-btn person-" + person.toLowerCase() + (item.assignedTo.includes(person) ? " selected" : "");
+          b.textContent = person;
+          b.addEventListener("click", () => {
+            const i = item.assignedTo.indexOf(person);
+            if (i === -1) item.assignedTo.push(person);
+            else item.assignedTo.splice(i, 1);
+            renderEditItems();
+          });
+          group.appendChild(b);
+        });
+        assignTd.appendChild(group);
+
+        const removeTd = document.createElement("td");
+        const removeBtn = document.createElement("button");
+        removeBtn.type = "button";
+        removeBtn.className = "assign-btn";
+        removeBtn.textContent = "✕";
+        removeBtn.addEventListener("click", () => {
+          editItems.splice(idx, 1);
+          renderEditItems();
+        });
+        removeTd.appendChild(removeBtn);
+
+        tr.appendChild(nameTd);
+        tr.appendChild(priceTd);
+        tr.appendChild(assignTd);
+        tr.appendChild(removeTd);
+        itemsTbody.appendChild(tr);
+      });
+      checkEditMatch();
+    }
+    renderEditItems();
+
     const saveEditBtn = document.createElement("button");
     saveEditBtn.type = "button";
     saveEditBtn.className = "primary";
@@ -470,11 +588,31 @@ async function loadHistory() {
     const editStatus = document.createElement("p");
     editStatus.className = "hint";
     saveEditBtn.addEventListener("click", async () => {
+      const cleanItems = editItems.filter((i) => i.name.trim());
+      if (cleanItems.length === 0) {
+        editStatus.textContent = "Agregá al menos un item.";
+        return;
+      }
+      const unassigned = cleanItems.filter((i) => i.assignedTo.length === 0);
+      if (unassigned.length > 0) {
+        editStatus.textContent = `Faltan asignar ${unassigned.length} item(s).`;
+        return;
+      }
+
+      const shares = Object.fromEntries(PEOPLE.map((p) => [p, 0]));
+      cleanItems.forEach((item) => {
+        const share = item.price / item.assignedTo.length;
+        item.assignedTo.forEach((p) => { shares[p] += share; });
+      });
+
       const { error } = await supabase.from("bills").update({
         title: titleInput.value.trim() || null,
         date: dateInput.value,
         payer: payerSelect.value,
-        category: categorySelect.value
+        category: categorySelect.value,
+        items: cleanItems.map(({ name, price, assignedTo }) => ({ name: name.trim(), price, assignedTo })),
+        shares,
+        total: parseFloat(editTotalInput.value) || 0
       }).eq("id", bill.id);
       if (error) {
         editStatus.textContent = friendlyError(error);
@@ -488,6 +626,9 @@ async function loadHistory() {
     editForm.appendChild(dateLabel);
     editForm.appendChild(payerLabel);
     editForm.appendChild(categoryLabel);
+    editForm.appendChild(itemsWrap);
+    editForm.appendChild(addItemBtn);
+    editForm.appendChild(editTotalsRow);
     editForm.appendChild(saveEditBtn);
     editForm.appendChild(editStatus);
     details.appendChild(editForm);
