@@ -436,6 +436,10 @@ tbody tr:nth-child(even) {
   border-bottom: none;
 }
 
+.settle-row[hidden] {
+  display: none;
+}
+
 .toggle-list-btn {
   margin-top: 0.75rem;
 }
