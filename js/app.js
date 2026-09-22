@@ -754,8 +754,9 @@ async function loadBalances() {
     supabase.from("settlements").select("*").order("created_at", { ascending: false })
   ]);
 
-  if (billsErr) {
-    pairEl.textContent = friendlyError(billsErr);
+  if (billsErr || paysErr) {
+    pairEl.textContent = friendlyError(billsErr || paysErr);
+    paymentsEl.textContent = friendlyError(billsErr || paysErr);
     return;
   }
 
@@ -819,10 +820,6 @@ async function loadBalances() {
   }
 
   // Recorded payments (audit trail, with undo)
-  if (paysErr) {
-    paymentsEl.textContent = "";
-    return;
-  }
   paymentsEl.innerHTML = "";
   if (!payments || payments.length === 0) {
     paymentsEl.textContent = "Todavía no se registraron pagos.";
