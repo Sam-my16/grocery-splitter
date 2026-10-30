@@ -1,6 +1,9 @@
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 import { SUPABASE_URL, SUPABASE_ANON_KEY, PEOPLE } from "./supabase-config.js";
 
+import { prepareBill, pairAccount, localDate, amount, displayCents } from "./core.js";
+import { initPurchase, renderItemCards } from "./purchase.js";
+
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const statusEl = document.getElementById("auth-status");
@@ -33,7 +36,11 @@ function friendlyError(error) {
 // ---------- Person colors ----------
 const PERSON_PALETTE = ["oklch(68% 0.17 45)", "oklch(62% 0.17 310)", "oklch(62% 0.15 230)", "oklch(62% 0.16 190)"];
 const PERSON_VAR = { Sammy: "--sammy", Nubi: "--nubi", Gabriel: "--gabriel" };
-let personColorIdx = JSON.parse(localStorage.getItem("cc-person-colors") || "null") || { Sammy: 0, Nubi: 1, Gabriel: 2 };
+let personColorIdx = { Sammy: 0, Nubi: 1, Gabriel: 2 };
+try {
+  const stored = JSON.parse(localStorage.getItem("cc-person-colors"));
+  if (stored && PEOPLE.every(p => Number.isInteger(stored[p]) && stored[p] >= 0 && stored[p] < PERSON_PALETTE.length)) personColorIdx = stored;
+} catch { /* Preferences must not prevent purchase entry. */ }
 
 function applyPersonColors() {
   PEOPLE.forEach((p) => {
@@ -61,7 +68,7 @@ document.querySelectorAll(".avatar").forEach((el) => {
         ev.stopPropagation();
         if (taken.includes(idx)) return;
         personColorIdx = { ...personColorIdx, [person]: idx };
-        localStorage.setItem("cc-person-colors", JSON.stringify(personColorIdx));
+        try { localStorage.setItem("cc-person-colors", JSON.stringify(personColorIdx)); } catch {}
         applyPersonColors();
         picker.remove();
       });
@@ -84,14 +91,14 @@ setThemeLabel(document.documentElement.getAttribute("data-theme"));
 themeToggleBtn.addEventListener("click", () => {
   const next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
   document.documentElement.setAttribute("data-theme", next);
-  localStorage.setItem("cc-theme", next);
+  try { localStorage.setItem("cc-theme", next); } catch {}
   setThemeLabel(next);
 });
 
 // ---------- Tabs ----------
-document.querySelectorAll(".tab-btn").forEach((btn) => {
+document.querySelectorAll("[data-tab]").forEach((btn) => {
   btn.addEventListener("click", () => {
-    document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+    document.querySelectorAll("[data-tab]").forEach((b) => b.classList.remove("active"));
     document.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("active"));
     btn.classList.add("active");
     document.getElementById(btn.dataset.tab).classList.add("active");
@@ -124,13 +131,6 @@ document.getElementById("copy-prompt-btn").addEventListener("click", async () =>
   setTimeout(() => { status.textContent = ""; }, 3000);
 });
 
-// ---------- CSV parsing ----------
-let items = []; // { name, price, assignedTo: [] }
-
-function sameSet(a, b) {
-  return a.length === b.length && a.every((x) => b.includes(x));
-}
-
 function pairCombos(arr) {
   const res = [];
   for (let i = 0; i < arr.length; i++) {
@@ -145,189 +145,8 @@ function catClass(cat) {
   return "cat-" + String(cat || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-");
 }
 
-document.getElementById("csv-file").addEventListener("change", (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = (ev) => {
-    document.getElementById("csv-input").value = ev.target.result;
-  };
-  reader.readAsText(file);
-});
-
-document.getElementById("parse-btn").addEventListener("click", () => {
-  const raw = document.getElementById("csv-input").value.trim();
-  if (!raw) return;
-
-  const rows = Papa.parse(raw, { skipEmptyLines: true }).data;
-  if (!rows || rows.length === 0) return;
-
-  // Con una sola línea no hay forma de tener encabezado + dato: es un item suelto.
-  // Con varias líneas, un encabezado real tiene texto (no un número) en la 2da columna.
-  const secondCell = rows[0][1];
-  const looksLikeHeader = rows.length > 1 &&
-    isNaN(parseFloat(String(secondCell ?? "").replace(",", ".")));
-
-  let dataRows = rows;
-  let itemIdx = 0;
-  let priceIdx = 1;
-
-  if (looksLikeHeader) {
-    const header = rows[0].map((h) => String(h).trim());
-    const foundItem = header.findIndex((f) => /item|producto|nombre/i.test(f));
-    const foundPrice = header.findIndex((f) => /price|precio|final|total/i.test(f));
-    if (foundItem !== -1) itemIdx = foundItem;
-    if (foundPrice !== -1) priceIdx = foundPrice;
-    dataRows = rows.slice(1);
-  }
-
-  items = dataRows
-    .filter((row) => row[itemIdx])
-    .map((row) => ({
-      name: String(row[itemIdx]).trim(),
-      price: parseFloat(String(row[priceIdx]).replace(",", ".")) || 0,
-      assignedTo: []
-    }));
-
-  renderItems();
-  document.getElementById("items-card").hidden = false;
-  document.getElementById("save-card").hidden = false;
-  document.getElementById("bill-date").valueAsDate = new Date();
-});
-
-function renderItems() {
-  const tbody = document.getElementById("items-tbody");
-  tbody.innerHTML = "";
-  items.forEach((item, idx) => {
-    const tr = document.createElement("tr");
-
-    const nameTd = document.createElement("td");
-    nameTd.textContent = item.name;
-
-    const priceTd = document.createElement("td");
-    priceTd.textContent = fmt(item.price);
-
-    const assignTd = document.createElement("td");
-
-    const quickGroup = document.createElement("div");
-    quickGroup.className = "assign-group quick-group";
-
-    const allBtn = document.createElement("button");
-    allBtn.type = "button";
-    allBtn.className = "assign-btn quick-btn" + (sameSet(item.assignedTo, PEOPLE) ? " selected" : "");
-    allBtn.textContent = "Todos";
-    allBtn.addEventListener("click", () => {
-      item.assignedTo = [...PEOPLE];
-      renderItems();
-      updateTotals();
-    });
-    quickGroup.appendChild(allBtn);
-
-    pairCombos(PEOPLE).forEach(([a, b]) => {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "assign-btn quick-btn" + (sameSet(item.assignedTo, [a, b]) ? " selected" : "");
-      btn.textContent = `${a} + ${b}`;
-      btn.addEventListener("click", () => {
-        item.assignedTo = [a, b];
-        renderItems();
-        updateTotals();
-      });
-      quickGroup.appendChild(btn);
-    });
-    assignTd.appendChild(quickGroup);
-
-    const group = document.createElement("div");
-    group.className = "assign-group";
-    PEOPLE.forEach((person) => {
-      const b = document.createElement("button");
-      b.type = "button";
-      b.className = "assign-btn person-" + person.toLowerCase() + (item.assignedTo.includes(person) ? " selected" : "");
-      b.textContent = person;
-      b.addEventListener("click", () => {
-        const i = item.assignedTo.indexOf(person);
-        if (i === -1) item.assignedTo.push(person);
-        else item.assignedTo.splice(i, 1);
-        renderItems();
-        updateTotals();
-      });
-      group.appendChild(b);
-    });
-    assignTd.appendChild(group);
-
-    tr.appendChild(nameTd);
-    tr.appendChild(priceTd);
-    tr.appendChild(assignTd);
-    tbody.appendChild(tr);
-  });
-  updateTotals();
-}
-
-function updateTotals() {
-  const sum = items.reduce((s, i) => s + i.price, 0);
-  document.getElementById("sum-items").textContent = fmt(sum);
-  const billTotalInput = document.getElementById("bill-total");
-  if (!billTotalInput.value) billTotalInput.value = sum.toFixed(2);
-  checkMatch();
-}
-
-document.getElementById("bill-total").addEventListener("input", checkMatch);
-
-function checkMatch() {
-  const sum = items.reduce((s, i) => s + i.price, 0);
-  const total = parseFloat(document.getElementById("bill-total").value) || 0;
-  const badge = document.getElementById("total-match");
-  const diff = Math.abs(sum - total);
-  if (diff < 0.01) {
-    badge.textContent = "Coincide";
-    badge.className = "badge ok";
-  } else {
-    badge.textContent = `Diferencia: ${fmt(diff)}`;
-    badge.className = "badge bad";
-  }
-}
-
-// ---------- Save bill ----------
-document.getElementById("save-bill-btn").addEventListener("click", async () => {
-  if (!ready) return;
-  const unassigned = items.filter((i) => i.assignedTo.length === 0);
-  if (unassigned.length > 0) {
-    document.getElementById("save-status").textContent =
-      `Faltan asignar ${unassigned.length} item(s).`;
-    return;
-  }
-
-  const shares = Object.fromEntries(PEOPLE.map((p) => [p, 0]));
-  items.forEach((item) => {
-    const share = item.price / item.assignedTo.length;
-    item.assignedTo.forEach((p) => { shares[p] += share; });
-  });
-
-  const total = parseFloat(document.getElementById("bill-total").value) || 0;
-  const payer = document.getElementById("bill-payer").value;
-  const date = document.getElementById("bill-date").value;
-  const title = document.getElementById("bill-title").value.trim() || null;
-  const category = document.getElementById("bill-category").value;
-
-  const { error } = await supabase.from("bills").insert({
-    date, payer, total, items, shares, title, category
-  });
-
-  if (error) {
-    document.getElementById("save-status").textContent = friendlyError(error);
-    return;
-  }
-
-  document.getElementById("save-status").textContent = "Guardado.";
-  items = [];
-  document.getElementById("csv-input").value = "";
-  document.getElementById("items-card").hidden = true;
-  document.getElementById("save-card").hidden = true;
-  document.getElementById("bill-total").value = "";
-  document.getElementById("bill-title").value = "";
-  document.getElementById("bill-category").value = "Supermercado";
-  loadHistory();
-  loadBalances();
+initPurchase({ supabase, people: PEOPLE, isReady: () => ready, friendlyError,
+  onSaved: () => { loadHistory(); loadBalances(); }
 });
 
 // ---------- History ----------
@@ -353,7 +172,7 @@ async function loadHistory() {
     return;
   }
 
-  const currentMonth = new Date().toISOString().slice(0, 7);
+  const currentMonth = localDate().slice(0, 7);
   const billsThisMonth = bills.filter((bill) => bill.date.slice(0, 7) === currentMonth);
 
   const byCategory = {};
@@ -372,7 +191,7 @@ async function loadHistory() {
       const row = document.createElement("div");
       row.style.marginBottom = "0.75rem";
       const pct = Math.round((total / maxCat) * 100);
-      row.innerHTML = `<div class="balance-row" style="border-bottom:none;padding-bottom:0;"><span>${cat}</span><span>${fmt(total)}</span></div>` +
+      row.innerHTML = `<div class="balance-row" style="border-bottom:none;padding-bottom:0;"><span>${escapeHTML(cat)}</span><span>${fmt(total)}</span></div>` +
         `<div class="cat-bar-track"><div class="cat-bar-fill ${catClass(cat)}" style="width:${pct}%"></div></div>`;
       catEl.appendChild(row);
     });
@@ -396,9 +215,9 @@ async function loadHistory() {
     const details = document.createElement("details");
     details.className = "history-item";
     const label = bill.title ? `${bill.title} (${bill.date})` : bill.date;
-    const categoryTag = bill.category ? `<span class="cat-tag ${catClass(bill.category)}">${bill.category}</span> ` : "";
+    const categoryTag = bill.category ? `<span class="cat-tag ${catClass(bill.category)}">${escapeHTML(bill.category)}</span> ` : "";
     const summary = document.createElement("summary");
-    summary.innerHTML = `<span>${categoryTag}${label} — pagó ${bill.payer}</span><span>${fmt(bill.total)}</span>`;
+    summary.innerHTML = `<span>${categoryTag}${escapeHTML(label)} — pagó ${escapeHTML(bill.payer)}</span><span>${fmt(bill.total)}</span>`;
     details.appendChild(summary);
 
     const owed = PEOPLE.filter((p) => p !== bill.payer && bill.shares && bill.shares[p] > 0.009)
@@ -472,11 +291,8 @@ async function loadHistory() {
 
     const itemsWrap = document.createElement("div");
     itemsWrap.style.width = "100%";
-    const itemsTable = document.createElement("table");
-    itemsTable.innerHTML = "<thead><tr><th>Item</th><th>Precio</th><th>Asignar a</th><th></th></tr></thead>";
-    const itemsTbody = document.createElement("tbody");
-    itemsTable.appendChild(itemsTbody);
-    itemsWrap.appendChild(itemsTable);
+    const itemsList = document.createElement("div");
+    itemsWrap.appendChild(itemsList);
 
     const addItemBtn = document.createElement("button");
     addItemBtn.type = "button";
@@ -494,8 +310,8 @@ async function loadHistory() {
     const editTotalLabel = document.createElement("label");
     editTotalLabel.textContent = "Total de la boleta";
     const editTotalInput = document.createElement("input");
-    editTotalInput.type = "number";
-    editTotalInput.step = "0.01";
+    editTotalInput.type = "text";
+    editTotalInput.inputMode = "decimal";
     editTotalInput.value = bill.total;
     editTotalLabel.appendChild(editTotalInput);
     const editMatchBadge = document.createElement("span");
@@ -505,11 +321,15 @@ async function loadHistory() {
     editTotalsRow.appendChild(editMatchBadge);
 
     function checkEditMatch() {
-      const sum = editItems.reduce((s, i) => s + (parseFloat(i.price) || 0), 0);
-      const total = parseFloat(editTotalInput.value) || 0;
+      const valid = editItems.every(i => Number.isFinite(amount(i.price)));
+      const sum = editItems.reduce((s, i) => s + (Number.isFinite(amount(i.price)) ? Math.round(amount(i.price) * 100) : 0), 0) / 100;
+      const total = amount(editTotalInput.value);
       const diff = Math.abs(sum - total);
       editSumEl.textContent = `Suma de items: ${fmt(sum)}`;
-      if (diff < 0.01) {
+      if (!valid || !Number.isFinite(total)) {
+        editMatchBadge.textContent = "Revisá los precios y el total";
+        editMatchBadge.className = "badge bad";
+      } else if (Math.round(sum * 100) === Math.round(total * 100)) {
         editMatchBadge.textContent = "Coincide";
         editMatchBadge.className = "badge ok";
       } else {
@@ -520,63 +340,7 @@ async function loadHistory() {
     editTotalInput.addEventListener("input", checkEditMatch);
 
     function renderEditItems() {
-      itemsTbody.innerHTML = "";
-      editItems.forEach((item, idx) => {
-        const tr = document.createElement("tr");
-
-        const nameTd = document.createElement("td");
-        const nameInput = document.createElement("input");
-        nameInput.type = "text";
-        nameInput.value = item.name;
-        nameInput.addEventListener("input", () => { item.name = nameInput.value; });
-        nameTd.appendChild(nameInput);
-
-        const priceTd = document.createElement("td");
-        const priceInput = document.createElement("input");
-        priceInput.type = "number";
-        priceInput.step = "0.01";
-        priceInput.value = item.price;
-        priceInput.addEventListener("input", () => {
-          item.price = parseFloat(priceInput.value) || 0;
-          checkEditMatch();
-        });
-        priceTd.appendChild(priceInput);
-
-        const assignTd = document.createElement("td");
-        const group = document.createElement("div");
-        group.className = "assign-group";
-        PEOPLE.forEach((person) => {
-          const b = document.createElement("button");
-          b.type = "button";
-          b.className = "assign-btn person-" + person.toLowerCase() + (item.assignedTo.includes(person) ? " selected" : "");
-          b.textContent = person;
-          b.addEventListener("click", () => {
-            const i = item.assignedTo.indexOf(person);
-            if (i === -1) item.assignedTo.push(person);
-            else item.assignedTo.splice(i, 1);
-            renderEditItems();
-          });
-          group.appendChild(b);
-        });
-        assignTd.appendChild(group);
-
-        const removeTd = document.createElement("td");
-        const removeBtn = document.createElement("button");
-        removeBtn.type = "button";
-        removeBtn.className = "assign-btn";
-        removeBtn.textContent = "✕";
-        removeBtn.addEventListener("click", () => {
-          editItems.splice(idx, 1);
-          renderEditItems();
-        });
-        removeTd.appendChild(removeBtn);
-
-        tr.appendChild(nameTd);
-        tr.appendChild(priceTd);
-        tr.appendChild(assignTd);
-        tr.appendChild(removeTd);
-        itemsTbody.appendChild(tr);
-      });
+      renderItemCards(itemsList, editItems, PEOPLE, checkEditMatch);
       checkEditMatch();
     }
     renderEditItems();
@@ -587,39 +351,24 @@ async function loadHistory() {
     saveEditBtn.textContent = "Guardar cambios";
     const editStatus = document.createElement("p");
     editStatus.className = "hint";
+    editStatus.setAttribute("role", "status");
     saveEditBtn.addEventListener("click", async () => {
-      const cleanItems = editItems.filter((i) => i.name.trim());
-      if (cleanItems.length === 0) {
-        editStatus.textContent = "Agregá al menos un item.";
-        return;
-      }
-      const unassigned = cleanItems.filter((i) => i.assignedTo.length === 0);
-      if (unassigned.length > 0) {
-        editStatus.textContent = `Faltan asignar ${unassigned.length} item(s).`;
-        return;
-      }
-
-      const shares = Object.fromEntries(PEOPLE.map((p) => [p, 0]));
-      cleanItems.forEach((item) => {
-        const share = item.price / item.assignedTo.length;
-        item.assignedTo.forEach((p) => { shares[p] += share; });
-      });
-
-      const { error } = await supabase.from("bills").update({
-        title: titleInput.value.trim() || null,
-        date: dateInput.value,
-        payer: payerSelect.value,
-        category: categorySelect.value,
-        items: cleanItems.map(({ name, price, assignedTo }) => ({ name: name.trim(), price, assignedTo })),
-        shares,
-        total: parseFloat(editTotalInput.value) || 0
-      }).eq("id", bill.id);
-      if (error) {
-        editStatus.textContent = friendlyError(error);
-        return;
-      }
-      loadHistory();
-      loadBalances();
+      if (saveEditBtn.disabled) return;
+      let payload;
+      try {
+        payload = prepareBill({ title: titleInput.value, date: dateInput.value,
+          payer: payerSelect.value, category: categorySelect.value,
+          items: editItems, total: editTotalInput.value }, PEOPLE);
+      } catch (error) { editStatus.textContent = error.message; return; }
+      const controls = [...editForm.querySelectorAll("input, select, button")];
+      controls.forEach(control => { control.disabled = true; });
+      editStatus.textContent = "Guardando…";
+      try {
+        const { error } = await supabase.from("bills").update(payload).eq("id", bill.id);
+        if (error) throw error;
+        loadHistory(); loadBalances();
+      } catch (error) { editStatus.textContent = friendlyError(error); }
+      finally { controls.forEach(control => { control.disabled = false; }); }
     });
 
     editForm.appendChild(titleLabel);
@@ -630,8 +379,8 @@ async function loadHistory() {
     editForm.appendChild(addItemBtn);
     editForm.appendChild(editTotalsRow);
     editForm.appendChild(saveEditBtn);
-    editForm.appendChild(editStatus);
     details.appendChild(editForm);
+    details.appendChild(editStatus);
 
     const editBtn = document.createElement("button");
     editBtn.type = "button";
@@ -650,9 +399,7 @@ async function loadHistory() {
     delBtn.addEventListener("click", async (e) => {
       e.preventDefault();
       if (!confirm("¿Eliminar esta compra?")) return;
-      await supabase.from("bills").delete().eq("id", bill.id);
-      loadHistory();
-      loadBalances();
+      await runMutation(delBtn, editStatus, () => supabase.from("bills").delete().eq("id", bill.id), () => { loadHistory(); loadBalances(); });
     });
     actions.appendChild(delBtn);
     details.appendChild(actions);
@@ -717,7 +464,7 @@ function csvEscape(value) {
 document.getElementById("export-csv-btn").addEventListener("click", () => {
   if (historyBills.length === 0) return;
 
-  const headers = ["fecha", "mes", "titulo", "categoria", "pago", ...PEOPLE.map((p) => `parte_${p}`)];
+  const headers = ["fecha", "mes", "titulo", "categoria", "pago", "total", ...PEOPLE.map((p) => `parte_${p}`)];
   const rows = historyBills.map((bill) => [
     bill.date,
     bill.date.slice(0, 7),
@@ -733,15 +480,15 @@ document.getElementById("export-csv-btn").addEventListener("click", () => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `gastos_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.download = `gastos_${localDate()}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 });
 
 document.getElementById("clear-payments-btn").addEventListener("click", async () => {
   if (!confirm("¿Eliminar todos los pagos registrados? Esta acción no se puede deshacer.")) return;
-  await supabase.from("settlements").delete().not("id", "is", null);
-  loadBalances();
+  await runMutation(document.getElementById("clear-payments-btn"), document.getElementById("payments-status"),
+    () => supabase.from("settlements").delete().not("id", "is", null), loadBalances);
 });
 
 // ---------- Balances ----------
@@ -750,7 +497,7 @@ async function loadBalances() {
   const paymentsEl = document.getElementById("payments-list");
 
   const [{ data: bills, error: billsErr }, { data: payments, error: paysErr }] = await Promise.all([
-    supabase.from("bills").select("payer,total,shares"),
+    supabase.from("bills").select("id,date,title,category,payer,total,shares"),
     supabase.from("settlements").select("*").order("created_at", { ascending: false })
   ]);
 
@@ -760,59 +507,29 @@ async function loadBalances() {
     return;
   }
 
-  // Pairwise net debt: exactly what each pair owes each other, no group-wide optimization
-  const net = {};
-  function applyDebt(debtor, creditor, amt) {
-    if (debtor === creditor || !amt) return;
-    const [a, b] = [debtor, creditor].sort();
-    const sign = debtor === a ? 1 : -1;
-    net[`${a}|${b}`] = (net[`${a}|${b}`] || 0) + sign * amt;
-  }
-  (bills || []).forEach((bill) => {
-    PEOPLE.forEach((p) => {
-      if (p === bill.payer) return;
-      applyDebt(p, bill.payer, (bill.shares && bill.shares[p]) || 0);
-    });
-  });
-  (payments || []).forEach((s) => {
-    applyDebt(s.to_person, s.from_person, s.amount);
-  });
-
   pairEl.innerHTML = "";
   let anyPairDebt = false;
   pairCombos(PEOPLE).forEach(([a, b]) => {
-    const [sortedA, sortedB] = [a, b].sort();
-    const value = net[`${sortedA}|${sortedB}`] || 0;
-    if (Math.abs(value) < 0.01) return;
+    const account = pairAccount(bills || [], payments || [], a, b);
+    if (Math.abs(account.net) < 0.01) return;
     anyPairDebt = true;
-    const debtor = value > 0 ? sortedA : sortedB;
-    const creditor = value > 0 ? sortedB : sortedA;
-    const amt = Math.abs(value);
-
+    const debtor = account.net > 0 ? a : b;
+    const creditor = account.net > 0 ? b : a;
+    const detail = account.net > 0 ? account : pairAccount(bills || [], payments || [], b, a);
     const row = document.createElement("div");
-    row.className = "settle-row";
-    const text = document.createElement("span");
-    text.textContent = `${debtor} le debe ${fmt(amt)} a ${creditor}`;
+    row.className = "debt-card";
+    const top = document.createElement("div");
+    top.className = "settle-row";
+    const text = document.createElement("strong");
+    text.textContent = `${debtor} le debe ${fmt(detail.net)} a ${creditor}`;
     const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "assign-btn";
-    btn.textContent = "Marcar como pagado";
-    btn.addEventListener("click", async () => {
-      btn.disabled = true;
-      const { error } = await supabase.from("settlements").insert({ from_person: debtor, to_person: creditor, amount: amt });
-      if (error) {
-        const err = document.createElement("p");
-        err.className = "hint";
-        err.style.color = "var(--danger)";
-        err.textContent = friendlyError(error);
-        row.appendChild(err);
-        btn.disabled = false;
-        return;
-      }
-      loadBalances();
-    });
-    row.appendChild(text);
-    row.appendChild(btn);
+    btn.type = "button"; btn.className = "assign-btn"; btn.textContent = "Marcar como pagado";
+    const status = document.createElement("p");
+    status.className = "hint error-text"; status.setAttribute("role", "status");
+    btn.addEventListener("click", () => runMutation(btn, status,
+      () => supabase.from("settlements").insert({ from_person: debtor, to_person: creditor, amount: detail.net }), loadBalances));
+    top.append(text, btn);
+    row.append(top, renderDebtDetail(detail, debtor, creditor), status);
     pairEl.appendChild(row);
   });
   if (!anyPairDebt) {
@@ -836,11 +553,12 @@ async function loadBalances() {
     btn.textContent = "Deshacer";
     btn.addEventListener("click", async () => {
       if (!confirm("¿Deshacer este pago?")) return;
-      await supabase.from("settlements").delete().eq("id", s.id);
-      loadBalances();
+      await runMutation(btn, status, () => supabase.from("settlements").delete().eq("id", s.id), loadBalances);
     });
-    row.appendChild(text);
-    row.appendChild(btn);
+    const status = document.createElement("p");
+    status.className = "hint error-text";
+    status.setAttribute("role", "status");
+    row.append(text, btn, status);
     paymentsEl.appendChild(row);
   });
 
@@ -854,4 +572,59 @@ async function loadBalances() {
 
 function fmt(n) {
   return "$" + n.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function escapeHTML(value) {
+  return String(value ?? "").replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
+}
+
+async function runMutation(button, status, mutation, refresh) {
+  if (button.disabled) return;
+  button.disabled = true; status.textContent = "";
+  try {
+    const { error } = await mutation();
+    if (error) throw error;
+    await refresh();
+  } catch (error) { status.textContent = friendlyError(error); }
+  finally { button.disabled = false; }
+}
+
+function renderDebtDetail(account, debtor, creditor) {
+  const details = document.createElement("details");
+  details.className = "debt-detail";
+  const summary = document.createElement("summary"); summary.textContent = "Ver detalle";
+  details.append(summary);
+  const intro = document.createElement("p"); intro.className = "hint";
+  intro.textContent = `Resumen de la cuenta entre ${debtor} y ${creditor}, de todas las fechas. Los pagos se descuentan del saldo; no se asignan a boletas específicas.`;
+  details.append(intro);
+  const rows = [
+    [`Parte de ${debtor} en compras que pagó ${creditor}`, account.purchasesOwed],
+    [`Parte de ${creditor} en compras que pagó ${debtor}`, -account.purchasesOffset],
+    [`Pagos de ${debtor} a ${creditor}`, -account.paymentsSent],
+    [`Pagos de ${creditor} a ${debtor}`, account.paymentsReceived],
+    ["Saldo pendiente", account.net]
+  ];
+  const displayedSum = rows.slice(0, 4).reduce((sum, [, value]) => sum + displayCents(value), 0);
+  const rounding = displayCents(account.net) - displayedSum;
+  if (rounding) rows.splice(4, 0, ["Ajuste de visualización por redondeo", rounding / 100]);
+  rows.forEach(([label, value]) => {
+    const row = document.createElement("div"); row.className = "balance-row";
+    const text = document.createElement("span"); text.textContent = label;
+    const number = document.createElement("strong"); number.textContent = (value < 0 ? "−" : "") + fmt(Math.abs(value));
+    row.append(text, number); details.append(row);
+  });
+  const movements = document.createElement("details");
+  const heading = document.createElement("summary"); heading.textContent = "Compras y pagos incluidos";
+  const list = document.createElement("ul");
+  account.entries.slice().sort((a, b) => (b.date || "").localeCompare(a.date || "")).forEach(entry => {
+    const li = document.createElement("li");
+    const description = entry.kind === "purchase"
+      ? `${entry.title} · pagó ${entry.payer} · parte de ${entry.payer === creditor ? debtor : creditor}`
+      : `Pago de ${entry.from} a ${entry.to}`;
+    li.textContent = `${entry.date || "Sin fecha"} · ${description}: ${entry.amount < 0 ? "−" : "+"}${fmt(Math.abs(entry.amount))}`;
+    list.append(li);
+  });
+  movements.append(heading, list);
+  details.append(movements);
+  return details;
 }

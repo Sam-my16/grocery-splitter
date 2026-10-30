@@ -12,10 +12,11 @@
 <meta name="apple-mobile-web-app-title" content="Cuentas Claras">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700;800&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=12">
+<link rel="stylesheet" href="css/style.css?v=13">
 <script>
   (function () {
-    var stored = localStorage.getItem("cc-theme");
+    var stored;
+    try { stored = localStorage.getItem("cc-theme"); } catch {}
     var theme = stored || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
     document.documentElement.setAttribute("data-theme", theme);
   })();
@@ -44,62 +45,64 @@
 
   <!-- NEW BILL TAB -->
   <section id="new-bill" class="tab-panel active">
-    <div class="card">
-      <div class="card-head"><span class="step-badge step-1">Paso 1</span><h2>Pegá o subí el CSV</h2></div>
-      <p class="hint">Pedile al agente (Claude, Gemini, etc.) que te devuelva un CSV con columnas <code>item,price</code> donde <code>price</code> ya tenga el descuento aplicado. Pegalo abajo o subí el archivo. Para cargar un solo item a mano no hace falta la fila de encabezado: alcanza con una línea tipo <code>Leche,1200</code>.</p>
-      <div class="row" style="margin-top: 0;">
-        <button type="button" id="copy-prompt-btn" class="assign-btn">Copiar prompt para el agente</button>
-        <span id="copy-prompt-status" class="hint"></span>
+    <div class="row purchase-toolbar">
+      <div class="entry-modes" role="group" aria-label="Tipo de compra">
+        <button type="button" class="tab-btn active" data-entry-mode="quick" aria-pressed="true">Gasto rápido</button>
+        <button type="button" class="tab-btn" data-entry-mode="import" aria-pressed="false">Importar compra</button>
       </div>
-      <textarea id="csv-input" rows="6" placeholder="item,price&#10;Leche,1200&#10;Pan,900&#10;..."></textarea>
-      <div class="row">
-        <input type="file" id="csv-file" accept=".csv,text/csv">
-        <button id="parse-btn" class="primary">Registrar</button>
-      </div>
+      <button type="button" id="discard-draft-btn" class="assign-btn">Descartar borrador</button>
     </div>
-
-    <div class="card" id="items-card" hidden>
-      <div class="card-head"><span class="step-badge step-2">Paso 2</span><h2>Asigná cada item</h2></div>
-      <table id="items-table">
-        <thead>
-          <tr><th>Item</th><th>Precio</th><th>Asignar a</th></tr>
-        </thead>
-        <tbody id="items-tbody"></tbody>
-      </table>
-      <div class="row totals">
-        <span>Suma de items: <strong id="sum-items">$0</strong></span>
-        <label>Total de la boleta: <input type="number" id="bill-total" step="0.01"></label>
-        <span id="total-match" class="badge"></span>
-      </div>
-    </div>
-
-    <div class="card" id="save-card" hidden>
-      <div class="card-head"><span class="step-badge step-3">Paso 3</span><h2>Guardar</h2></div>
-      <div class="row">
-        <label>Título (opcional)
-          <input type="text" id="bill-title" placeholder="Ej: Compra grande del mes">
-        </label>
-        <label>Fecha
-          <input type="date" id="bill-date">
-        </label>
-        <label>¿Quién pagó?
-          <select id="bill-payer">
-            <option>Sammy</option>
-            <option>Nubi</option>
-            <option>Gabriel</option>
-          </select>
-        </label>
-        <label>Categoría
-          <select id="bill-category">
-            <option>Supermercado</option>
-            <option>Salidas</option>
-            <option>Comida</option>
-          </select>
-        </label>
-        <button id="save-bill-btn" class="primary">Guardar compra</button>
-      </div>
-      <p id="save-status" class="hint"></p>
-    </div>
+    <p id="draft-status" class="hint" role="status"></p>
+    <form id="purchase-form" novalidate>
+      <fieldset id="purchase-fields">
+        <div class="card" id="import-card" hidden>
+          <h2>Pegá o subí tu compra</h2>
+          <p class="hint">Pegá el CSV del agente, incluso si viene entre comillas de código. También podés escribir una línea como <code>Leche,1200</code>.</p>
+          <details class="import-help"><summary>Ayuda para preparar la boleta</summary>
+            <p class="hint">Pedile al agente que extraiga los productos con sus precios finales, incluyendo descuentos.</p>
+            <button type="button" id="copy-prompt-btn" class="assign-btn">Copiar prompt para el agente</button>
+            <span id="copy-prompt-status" class="hint" role="status"></span>
+          </details>
+          <label for="csv-input">Productos y precios</label>
+          <textarea id="csv-input" rows="5" placeholder="item,price&#10;Leche,1200&#10;Pan,900"></textarea>
+          <div class="row">
+            <label for="csv-file">Subir CSV<input type="file" id="csv-file" accept=".csv,text/csv"></label>
+            <button type="button" id="parse-btn" class="primary">Revisar items</button>
+          </div>
+          <p id="import-status" class="hint error-text" role="status"></p>
+        </div>
+        <div class="card">
+          <h2 id="purchase-heading">Anotá un gasto</h2>
+          <div class="form-grid">
+            <label><span id="title-label">Descripción</span><input type="text" id="bill-title" placeholder="Ej: Cena, taxi o compra del día" autocomplete="off"></label>
+            <label id="quick-fields">Importe<input type="text" inputmode="decimal" id="quick-amount" placeholder="0,00"></label>
+            <label>¿Quién pagó?<select id="bill-payer"><option value="">Elegí una persona</option></select></label>
+            <label>Fecha<input type="date" id="bill-date"></label>
+            <label>Categoría<select id="bill-category"><option>Supermercado</option><option>Salidas</option><option>Comida</option></select></label>
+          </div>
+          <h3>¿Quiénes lo comparten?</h3>
+          <p class="hint" id="bulk-hint">Elegí una opción para toda la compra. Después podés ajustar cada item.</p>
+          <div id="bulk-participants" class="assign-group" role="group" aria-label="Participantes de la compra"></div>
+        </div>
+        <div class="card" id="items-card" hidden>
+          <h2>Revisá los items</h2>
+          <div id="items-list"></div>
+          <button type="button" id="add-item-btn" class="assign-btn">+ Agregar item</button>
+          <div class="row totals">
+            <span>Suma de items: <strong id="sum-items">$0</strong></span>
+            <label>Total de la boleta<input type="text" inputmode="decimal" id="bill-total"></label>
+            <span id="total-match" class="badge" role="status"></span>
+          </div>
+        </div>
+        <div class="card" id="save-card">
+          <h2>Así queda repartido</h2>
+          <p id="unassigned-status" class="hint" role="status"></p>
+          <div id="purchase-shares" aria-live="polite"></div>
+          <div class="row"><button type="submit" id="save-bill-btn" class="primary">Guardar gasto</button></div>
+        </div>
+      </fieldset>
+    </form>
+    <p id="save-status" class="save-feedback" role="status" tabindex="-1"></p>
   </section>
 
   <!-- HISTORY TAB -->
@@ -128,13 +131,14 @@
         <h2>Pagos registrados</h2>
         <button id="clear-payments-btn" class="assign-btn">Eliminar todos</button>
       </div>
+      <p id="payments-status" class="hint error-text" role="status"></p>
       <div id="payments-list">Cargando...</div>
     </div>
   </section>
 </main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-<script type="module" src="js/app.js?v=21"></script>
+<script type="module" src="js/app.js?v=22"></script>
 <script>
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => navigator.serviceWorker.register("sw.js"));
