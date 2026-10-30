@@ -9,27 +9,26 @@ debe a quién, mes a mes. Se puede instalar como app (PWA) en el celular.
 Los datos (boletas, balances) se guardan en Supabase (Postgres) para que los
 tres vean lo mismo desde cualquier dispositivo.
 
-## Cómo usar la app (flujo mensual)
+## Cómo usar la app
 
-1. Después de cada compra, pedile a un agente (Claude, Gemini, etc.) algo así:
+- **Gasto rápido**: escribí una descripción y el importe, elegí quién pagó,
+  la fecha, la categoría y quiénes lo comparten. Revisá las partes y guardá.
+- **Importar compra**: pegá el CSV del agente (con o sin bloque de código) o
+  subí un archivo. Tocá **Revisar items**, elegí el reparto de toda la compra
+  y ajustá las excepciones. Podés editar, agregar o quitar productos antes de guardar.
+- El CSV acepta `item,price`, variantes en español y filas sin encabezado.
+  Los precios deben incluir los descuentos, sin símbolo de moneda ni miles.
+  La app indica las filas inválidas y exige que el total coincida con los items.
+- El borrador se guarda en este dispositivo al editar. Al volver, se recupera;
+  **Descartar borrador** permite empezar de nuevo. No se sincroniza entre dispositivos.
+- En **Historial** podés editar compras y exportarlas. En **Balances**, **Ver detalle**
+  explica las partes de las compras y los pagos en ambos sentidos. Es un saldo
+  de todas las fechas; los pagos no se asignan a boletas particulares.
+- **Marcar como pagado** registra una transferencia por el saldo completo;
+  **Deshacer** elimina ese registro si fue un error.
 
-   > Te paso la lista de items y precios de esta boleta del supermercado,
-   > incluyendo los descuentos aplicados. Devolveme un CSV con dos columnas,
-   > `item,price`, donde `price` sea el precio final ya con el descuento
-   > aplicado a cada item. La suma de la columna `price` tiene que dar el
-   > total de la boleta.
-
-2. Entrá a la página, pestaña **Nueva compra**, pegá el CSV (o subí el
-   archivo) y tocá **Registrar**.
-3. Asigná cada item a Sammy, Nubi y/o Gabriel (tocá más de uno para
-   dividirlo entre varios, o usá los botones rápidos "Todos" / de a pares).
-4. Revisá que la suma de items coincida con el total real de la boleta,
-   elegí la fecha, quién pagó y la categoría (Supermercado / Salidas /
-   Comida), y guardá.
-5. En la pestaña **Historial** vas a ver el gasto acumulado por categoría y
-   el detalle de cada compra. En **Balances**, cuánto le debe cada uno a
-   cada quien en total, con un botón para marcar como pagado cuando alguien
-   te transfiere.
+La app sigue necesitando conexión para guardar o consultar los datos compartidos.
+No lee fotos directamente: el botón **Copiar prompt para el agente** ayuda a preparar el CSV.
 
 ## Setup (una sola vez)
 
@@ -101,3 +100,18 @@ Sin build ni framework: HTML/CSS/JS plano + [PapaParse](https://www.papaparse.co
 para el CSV + [Supabase](https://supabase.com/) (Auth anónima + Postgres)
 para los datos compartidos. Todo corre en el navegador, servido como
 página estática por GitHub Pages.
+
+## Desarrollo y pruebas
+
+No hay build: serví la raíz del repositorio con cualquier servidor estático.
+Para ejecutar las pruebas instalá Node.js 22 o superior y Chrome:
+
+```sh
+npm install
+npm test
+npm run test:ui
+```
+
+Las pruebas de interfaz levantan un servidor local en el puerto 4173 y usan
+respuestas de Supabase simuladas, sin modificar los datos reales. Cubren vistas
+móviles y escritorio. Los paquetes npm son sólo herramientas de desarrollo.

@@ -1,0 +1,13 @@
+{
+  "name": "cuentas-claras",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/core.test.js",
+    "test:ui": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.0",
+    "papaparse": "5.4.1"
+  }
+}
