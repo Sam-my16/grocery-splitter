@@ -67,6 +67,39 @@ test('local date does not roll into tomorrow at UTC midnight', () => {
   assert.equal(localDate(date), '2026-10-30');
 });
 
+const purchase = (id, date, value, title = id, payer = 'Sammy') => ({ id, date, title, payer, shares: { [payer === 'Sammy' ? 'Nubi' : 'Sammy']: value } });
+const payment = (amount, reverse = false) => ({ amount, from_person: reverse ? 'Sammy' : 'Nubi', to_person: reverse ? 'Nubi' : 'Sammy' });
+const pending = (bills, payments = []) => pairAccount(bills, payments, 'Nubi', 'Sammy').pending;
+
+test('pending purchases explain the 6000 balance and preserve missing titles for date fallback', () => {
+  const rows = pending([purchase('a', '2026-08-30', 4000, 'Supermercado'), purchase('b', '2026-08-31', 500, null), purchase('c', '2026-10-30', 1500, 'Compra de hoy')]);
+  assert.deepEqual(rows.map(r => [r.title, r.amount]), [['Supermercado', 4000], [null, 500], ['Compra de hoy', 1500]]);
+});
+
+test('offsets oldest purchases first, handles reverse purchases/payments and clears paid purchases', () => {
+  const bills = [purchase('new', '2026-10-02', 50), purchase('old', '2026-10-01', 100), purchase('offset', '2026-10-03', 40, 'Cena', 'Nubi')];
+  assert.deepEqual(pending(bills, [payment(80), payment(5, true)]).map(r => [r.id, r.amount]), [['new', 35]]);
+  assert.deepEqual(pending(bills, [payment(110)]), []);
+  const reverse = pairAccount(bills, [payment(120)], 'Sammy', 'Nubi');
+  assert.equal(reverse.net, 10);
+  assert.equal(reverse.pending.reduce((sum, r) => sum + r.amount, 0), 10);
+});
+
+test('payment-only and excess-payment balances are explicit instead of invented purchases', () => {
+  assert.deepEqual(pending([], [payment(25, true)]).map(r => [r.title, r.amount]), [['Saldo por pagos', 25]]);
+  assert.deepEqual(pending([purchase('a', '2026-10-01', 10)], [payment(15, true)]).map(r => r.amount), [10, 15]);
+});
+
+test('pending cents reconcile fractional shares and use deterministic same-date ordering', () => {
+  const bills = ['a', 'b', 'c'].map(id => purchase(id, '2026-10-01', 1 / 3));
+  for (const paid of [0, 0.125, 0.5, 0.99, 1]) {
+    const account = pairAccount(bills, [payment(paid)], 'Nubi', 'Sammy');
+    assert.equal(account.pending.reduce((sum, r) => sum + displayCents(r.amount), 0), displayCents(account.net));
+    assert.ok(account.pending.every(r => r.amount > 0));
+    assert.deepEqual(pending([...bills].reverse(), [payment(paid)]), account.pending);
+  }
+});
+
 test('display rounding reconciles half-cent offsets and decimal floating point ties', () => {
   assert.equal(displayCents(-0.125), -13);
   assert.equal(displayCents(0.875), 88);

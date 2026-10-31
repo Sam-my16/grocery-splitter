@@ -91,7 +91,7 @@ export function pairAccount(bills, payments, person, other) {
     let value = 0;
     if (bill.payer === other) { value = Number(bill.shares?.[person]) || 0; purchasesOwed += value; }
     if (bill.payer === person) { const share = Number(bill.shares?.[other]) || 0; purchasesOffset += share; value = -share; }
-    if (value) entries.push({ kind: 'purchase', amount: value, date: bill.date, title: bill.title || bill.category || 'Compra', payer: bill.payer, id: bill.id });
+    if (value) entries.push({ kind: 'purchase', amount: value, date: bill.date, title: bill.title?.trim() || null, payer: bill.payer, id: bill.id });
   }
   for (const payment of payments) {
     let value = 0;
@@ -99,5 +99,23 @@ export function pairAccount(bills, payments, person, other) {
     if (payment.from_person === other && payment.to_person === person) { paymentsReceived += Number(payment.amount); value = Number(payment.amount); }
     if (value) entries.push({ kind: 'payment', amount: value, date: payment.created_at?.slice(0, 10) || '', from: payment.from_person, to: payment.to_person, id: payment.id });
   }
-  return { purchasesOwed, purchasesOffset, paymentsSent, paymentsReceived, net: purchasesOwed - purchasesOffset - paymentsSent + paymentsReceived, entries };
+  const net = purchasesOwed - purchasesOffset - paymentsSent + paymentsReceived;
+  const pending = [];
+  let remaining = Math.max(0, net);
+  // Keep the newest purchases outstanding, offsetting the oldest first.
+  // ID breaks same-date ties independently of database response order.
+  const purchases = entries.filter(e => e.kind === 'purchase' && e.amount > 0)
+    .sort((a, b) => (b.date || '').localeCompare(a.date || '') || String(b.id || '').localeCompare(String(a.id || '')));
+  for (const entry of purchases) {
+    const value = Math.min(entry.amount, remaining);
+    const next = Math.max(0, remaining - value);
+    // Differences of rounded running totals preserve the displayed net exactly.
+    const cents = displayCents(remaining) - displayCents(next);
+    if (cents > 0) pending.push({ ...entry, amount: cents / 100 });
+    remaining = next;
+  }
+  pending.reverse();
+  // An excess reverse payment may create debt with no purchase behind it.
+  if (displayCents(remaining) > 0) pending.push({ kind: 'payment', title: 'Saldo por pagos', amount: displayCents(remaining) / 100 });
+  return { purchasesOwed, purchasesOffset, paymentsSent, paymentsReceived, net, entries, pending };
 }

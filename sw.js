@@ -1,9 +1,9 @@
-const CACHE_NAME = "cuentas-claras-v3";
+const CACHE_NAME = "cuentas-claras-v4";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./css/style.css?v=13",
-  "./js/app.js?v=22",
+  "./js/app.js?v=23",
   "./js/core.js",
   "./js/purchase.js",
   "./js/supabase-config.js",

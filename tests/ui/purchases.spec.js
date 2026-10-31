@@ -118,9 +118,10 @@ test('debt detail reconciles both directions, safely renders titles, and reports
   await page.getByRole('button', { name: 'Balances', exact: true }).click();
   const pair = page.locator('.debt-card').filter({ hasText: 'Nubi le debe $30,00 a Sammy' });
   await pair.getByText('Ver detalle', { exact: true }).click();
-  await expect(pair).toContainText('$100,00');
-  await expect(pair).toContainText('$40,00');
-  await pair.getByText('Compras y pagos incluidos', { exact: true }).click();
+  await expect(pair.locator('.debt-detail .balance-row')).toHaveCount(1);
+  await expect(pair.locator('.debt-detail strong')).toHaveText('$30,00');
+  await expect(pair.locator('.debt-detail')).not.toContainText('Resumen');
+  await expect(pair.locator('.debt-detail details')).toHaveCount(0);
   await expect(pair).toContainText('<img src=x onerror=alert(1)>');
   await expect(page.locator('.debt-card img')).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -207,12 +208,29 @@ test('fractional debt summary reconciles and a completed payment clears that pai
   const pair = page.locator('.debt-card');
   await expect(pair).toContainText('Nubi le debe $0,88 a Sammy');
   await pair.getByText('Ver detalle', { exact: true }).click();
-  await expect(pair.locator('.balance-row').filter({ hasText: 'Ajuste de visualización' })).toContainText('$0,01');
   const displayed = await pair.locator('.balance-row strong').allTextContents();
-  expect(displayed).toEqual(['$1,00', '−$0,13', '$0,00', '$0,00', '$0,01', '$0,88']);
+  expect(displayed).toEqual(['$0,88']);
   await pair.getByRole('button', { name: 'Marcar como pagado' }).click();
   await expect(page.locator('#pairwise-list')).toHaveText('Todo saldado entre todos.');
   page.once('dialog', dialog => dialog.accept());
   await page.getByRole('button', { name: 'Deshacer', exact: true }).click();
   await expect(page.locator('#pairwise-list')).toContainText('Nubi le debe $0,88 a Sammy');
+});
+
+test('pending detail uses purchase titles or dates and hides paid purchases', async ({ page }) => {
+  const fixture = (id, date, title, value) => ({ id, date, title, category: 'Comida', payer: 'Sammy', total: value, items: [], shares: { Nubi: value, Sammy: 0, Gabriel: 0 } });
+  await openApp(page, { bills: [
+    fixture('paid', '2026-08-01', 'Compra saldada', 1000),
+    fixture('super', '2026-08-30', 'Supermercado', 4500),
+    fixture('date', '2026-08-31', '   ', 500),
+    fixture('today', '2026-10-30', 'Compra de hoy', 1500)
+  ], settlements: [{ id: 'p', from_person: 'Nubi', to_person: 'Sammy', amount: 1500, created_at: '2026-10-30T12:00:00Z' }] });
+  await page.getByRole('button', { name: 'Balances', exact: true }).click();
+  const pair = page.locator('.debt-card');
+  await expect(pair).toContainText('Nubi le debe $6.000,00 a Sammy');
+  await pair.getByText('Ver detalle', { exact: true }).click();
+  await expect(pair.locator('.balance-row span')).toHaveText(['Supermercado — ', '31-08-2026 — ', 'Compra de hoy — ']);
+  await expect(pair.locator('.balance-row strong')).toHaveText(['$4.000,00', '$500,00', '$1.500,00']);
+  await expect(pair.locator('.debt-detail')).not.toContainText('Compra saldada');
+  await expect(pair.locator('.debt-detail')).not.toContainText('Comida');
 });

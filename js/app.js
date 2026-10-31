@@ -1,7 +1,7 @@
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 import { SUPABASE_URL, SUPABASE_ANON_KEY, PEOPLE } from "./supabase-config.js";
 
-import { prepareBill, pairAccount, localDate, amount, displayCents } from "./core.js";
+import { prepareBill, pairAccount, localDate, amount } from "./core.js";
 import { initPurchase, renderItemCards } from "./purchase.js";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -529,7 +529,7 @@ async function loadBalances() {
     btn.addEventListener("click", () => runMutation(btn, status,
       () => supabase.from("settlements").insert({ from_person: debtor, to_person: creditor, amount: detail.net }), loadBalances));
     top.append(text, btn);
-    row.append(top, renderDebtDetail(detail, debtor, creditor), status);
+    row.append(top, renderDebtDetail(detail), status);
     pairEl.appendChild(row);
   });
   if (!anyPairDebt) {
@@ -589,42 +589,17 @@ async function runMutation(button, status, mutation, refresh) {
   finally { button.disabled = false; }
 }
 
-function renderDebtDetail(account, debtor, creditor) {
+function renderDebtDetail(account) {
   const details = document.createElement("details");
   details.className = "debt-detail";
   const summary = document.createElement("summary"); summary.textContent = "Ver detalle";
   details.append(summary);
-  const intro = document.createElement("p"); intro.className = "hint";
-  intro.textContent = `Resumen de la cuenta entre ${debtor} y ${creditor}, de todas las fechas. Los pagos se descuentan del saldo; no se asignan a boletas específicas.`;
-  details.append(intro);
-  const rows = [
-    [`Parte de ${debtor} en compras que pagó ${creditor}`, account.purchasesOwed],
-    [`Parte de ${creditor} en compras que pagó ${debtor}`, -account.purchasesOffset],
-    [`Pagos de ${debtor} a ${creditor}`, -account.paymentsSent],
-    [`Pagos de ${creditor} a ${debtor}`, account.paymentsReceived],
-    ["Saldo pendiente", account.net]
-  ];
-  const displayedSum = rows.slice(0, 4).reduce((sum, [, value]) => sum + displayCents(value), 0);
-  const rounding = displayCents(account.net) - displayedSum;
-  if (rounding) rows.splice(4, 0, ["Ajuste de visualización por redondeo", rounding / 100]);
-  rows.forEach(([label, value]) => {
+  account.pending.forEach(entry => {
     const row = document.createElement("div"); row.className = "balance-row";
-    const text = document.createElement("span"); text.textContent = label;
-    const number = document.createElement("strong"); number.textContent = (value < 0 ? "−" : "") + fmt(Math.abs(value));
+    const label = entry.title || (entry.date ? entry.date.split("-").reverse().join("-") : "Sin fecha");
+    const text = document.createElement("span"); text.textContent = `${label} — `;
+    const number = document.createElement("strong"); number.textContent = fmt(entry.amount);
     row.append(text, number); details.append(row);
   });
-  const movements = document.createElement("details");
-  const heading = document.createElement("summary"); heading.textContent = "Compras y pagos incluidos";
-  const list = document.createElement("ul");
-  account.entries.slice().sort((a, b) => (b.date || "").localeCompare(a.date || "")).forEach(entry => {
-    const li = document.createElement("li");
-    const description = entry.kind === "purchase"
-      ? `${entry.title} · pagó ${entry.payer} · parte de ${entry.payer === creditor ? debtor : creditor}`
-      : `Pago de ${entry.from} a ${entry.to}`;
-    li.textContent = `${entry.date || "Sin fecha"} · ${description}: ${entry.amount < 0 ? "−" : "+"}${fmt(Math.abs(entry.amount))}`;
-    list.append(li);
-  });
-  movements.append(heading, list);
-  details.append(movements);
   return details;
 }
