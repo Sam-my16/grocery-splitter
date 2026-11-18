@@ -1,117 +1,136 @@
-# Cuentas Claras
+# Cuentas Claras — shared grocery bill splitter
 
-Sitio estático para dividir los gastos de la casa entre Sammy, Nubi y
-Gabriel. Subís un CSV con los items de la boleta (generado por un agente de
-IA a partir de la foto/lista de la compra), asignás cada item a una o varias
-personas, y la app calcula cuánto le corresponde pagar a cada uno y quién le
-debe a quién, mes a mes. Se puede instalar como app (PWA) en el celular.
+A mobile-first web app (installable as a PWA) that a three-person household uses to split
+shared purchases item by item and keep a running, explainable balance of who owes whom.
 
-Los datos (boletas, balances) se guardan en Supabase (Postgres) para que los
-tres vean lo mismo desde cualquier dispositivo.
+**Live:** <https://sam-my16.github.io/grocery-splitter/> · **UI language:** Spanish ·
+**Stack:** vanilla HTML/CSS/JS, Supabase (Postgres + anonymous auth), GitHub Pages
 
-## Cómo usar la app
+> Built with AI-assisted development: I defined the product, wrote the specs, made the design
+> decisions and reviewed/tested each iteration; [Claude Code](https://claude.com/claude-code)
+> wrote most of the implementation. See [How it was built](#how-it-was-built).
 
-- **Gasto rápido**: escribí una descripción y el importe, elegí quién pagó,
-  la fecha, la categoría y quiénes lo comparten. Revisá las partes y guardá.
-- **Importar compra**: pegá el CSV del agente (con o sin bloque de código) o
-  subí un archivo. Tocá **Revisar items**, elegí el reparto de toda la compra
-  y ajustá las excepciones. Podés editar, agregar o quitar productos antes de guardar.
-- El CSV acepta `item,price`, variantes en español y filas sin encabezado.
-  Los precios deben incluir los descuentos, sin símbolo de moneda ni miles.
-  La app indica las filas inválidas y exige que el total coincida con los items.
-- El borrador se guarda en este dispositivo al editar. Al volver, se recupera;
-  **Descartar borrador** permite empezar de nuevo. No se sincroniza entre dispositivos.
-- En **Historial** podés editar compras y exportarlas. En **Balances**, **Ver detalle**
-  explica las partes de las compras y los pagos en ambos sentidos. Es un saldo
-  de todas las fechas; los pagos no se asignan a boletas particulares.
-- **Marcar como pagado** registra una transferencia por el saldo completo;
-  **Deshacer** elimina ese registro si fue un error.
+---
 
-La app sigue necesitando conexión para guardar o consultar los datos compartidos.
-No lee fotos directamente: el botón **Copiar prompt para el agente** ayuda a preparar el CSV.
+## The problem
 
-## Setup (una sola vez)
+Splitting a supermarket receipt evenly is unfair when not everyone uses every item, and
+splitting it by hand is tedious. Existing apps split *totals*, not *items*, and their
+balances become opaque after a few months of purchases and partial payments.
 
-### 1. Crear el proyecto de Supabase
+## What it does
 
-1. Andá a [supabase.com](https://supabase.com/), creá una cuenta y un
-   proyecto nuevo (plan Free alcanza). Elegí una contraseña de base de
-   datos (no la vas a necesitar para esto, pero Supabase la pide).
-2. **Authentication → Sign In / Providers → Anonymous Sign-Ins → activalo.**
-   Esto permite que la app identifique "alguien de la casa" sin pedir
-   usuario/contraseña.
-3. **SQL Editor → New query**, pegá el contenido de
-   [`supabase.sql`](supabase.sql) y ejecutalo. Esto crea la tabla `bills` y
-   las políticas de seguridad (Row Level Security).
-4. **Project Settings → API**. Copiá el **Project URL** y la **anon
-   public key**.
-5. Pegá esos valores en [`js/supabase-config.js`](js/supabase-config.js),
-   reemplazando los `"REEMPLAZAR"`. La anon key no es secreta (el acceso
-   real lo controlan las políticas de RLS), así que está bien commitearla.
+- **Item-level splitting.** Import a receipt as CSV, set the default participants for the
+  whole purchase, then mark exceptions per item. Shares are computed per item and summed.
+- **Receipt → CSV via an LLM.** The app doesn't do OCR itself; a *Copy prompt* button gives a
+  ready-made prompt for any multimodal model to turn a receipt photo into the expected CSV.
+  The parser is tolerant of what models actually output (fenced code blocks, Spanish/English
+  headers, missing header row, quoted names, decimal comma).
+- **Quick expenses** for one-off costs that don't need an item list.
+- **Explainable balances.** For each pair of people, *Ver detalle* lists the specific
+  purchases that make up the outstanding debt, after netting purchases in both directions
+  and recorded payments.
+- **Settlements without losing history.** *Mark as paid* records a transfer instead of
+  deleting bills; it can be undone.
+- **History** grouped by month, editable after the fact, exportable to CSV; monthly spend by
+  category.
+- **Draft recovery**: unfinished entries survive reloads (local only).
+- Light/dark theme, works offline as an installed app (data operations still need a connection).
 
-### 2. Activar GitHub Pages
+## Technical highlights
 
-En el repo: **Settings → Pages → Source: Deploy from a branch → Branch:
-`main` / `(root)` → Save**. Después de un minuto la página va a estar en
-`https://sam-my16.github.io/grocery-splitter/`.
+**Money correctness.** All validation goes through one pure module
+([`js/core.js`](js/core.js)) shared by new purchases, history edits and tests:
 
-### 4. Instalarla como app (PWA)
+- Amounts accept at most two decimals; a purchase is rejected unless the item prices sum
+  to the receipt total **in integer cents**, avoiding floating-point false mismatches.
+- Equal shares are stored unrounded (for backward compatibility with existing data) and only
+  rounded at display time.
 
-Desde el navegador del celular: **Compartir → Agregar a la pantalla de
-inicio** (iOS Safari) o **⋮ → Instalar app** (Android Chrome). Queda con
-ícono propio y abre en pantalla completa, sin la barra del navegador.
+**Explaining a net balance.** A pairwise balance is a single number, but users want to know
+*which purchases* it corresponds to. `pairAccount` attributes the net debt to the newest
+purchases, treating payments and reverse purchases as offsetting the oldest ones first
+(FIFO). Two details mattered:
 
-### 3. Personalizar nombres
+- *Rounding reconciliation:* each row's displayed amount is the difference between rounded
+  running totals, so the rows always add up exactly to the displayed balance, even with
+  shares like $1000/3.
+- *No invented attributions:* if an overpayment creates debt that no purchase explains, it's
+  shown as a separate "Saldo por pagos" line instead of being pinned on a bill.
 
-Si alguno de los nombres cambia, editá el array `PEOPLE` en
-[`js/supabase-config.js`](js/supabase-config.js).
+Ties on the same date are broken by ID, so the breakdown doesn't depend on database
+response order.
 
-## Formato del CSV
+**Zero-build architecture.** No framework, no bundler: ES modules served statically by GitHub
+Pages, a service worker for installability, cache-busted asset URLs to avoid stale mobile
+caches. Supabase provides shared state across devices with anonymous sign-in, so housemates
+don't need accounts.
 
-Columnas esperadas (nombres flexibles, detecta variantes en español/inglés):
+**Testing.** 13 unit tests (`node:test`) cover the money and balance rules — malformed CSVs,
+fractional shares, half-cent ties, both debt directions, excess payments, corrupted drafts.
+7 Playwright end-to-end tests run on desktop and mobile viewports against a **mocked
+Supabase**, covering failed and repeated saves, keyboard-only assignment, unavailable
+`localStorage` and safe rendering of user-provided titles.
 
-| item / producto | price / precio |
-|---|---|
-| Leche | 1200 |
-| Pan | 900 |
+## How it was built
 
-`price` debe ser el precio final del item, descuento ya aplicado. La suma de
-la columna tiene que coincidir con el total real de la boleta (la app te
-avisa si no coincide).
+The project was developed over ~2 months (Sep–Oct 2026) iteratively with Claude Code, driven by
+real usage feedback from the household. My role was product owner and reviewer:
 
-## Problemas comunes
+- **Specifying behavior.** Each larger change started as a written spec with scope, decisions
+  and acceptance checks — e.g. [`docs/ease-of-use-plan.md`](docs/ease-of-use-plan.md) and the
+  [debt-detail design](docs/superpowers/specs/2026-10-30-debt-detail-design.md), which works
+  through alternatives (showing original shares vs. linking payments to bills vs. FIFO
+  offsetting) before committing to one.
+- **Making the calls.** e.g. migrating from Firebase to Supabase early on; keeping
+  settlements as records instead of deleting history; preserving the existing data schema
+  instead of migrating it; no backend or AI service in the app itself.
+- **Catching bugs from real use** and turning them into fixes and regression tests —
+  inflated debts when a query failed, payments not collapsing in the balance view, clock skew
+  on phones breaking anonymous auth (now surfaced as a friendly message).
+- **Design.** The visual redesign was prototyped with Claude Design and then applied to the app.
 
-**"La fecha y hora de tu celular están mal" / error de conexión.** El login
-anónimo de Supabase depende de que el reloj del dispositivo esté bien
-sincronizado. Solución: **Ajustes → General → Fecha y hora → activar
-"Ajustar automáticamente"**, y volver a entrar a la página.
+What I took away: the leverage of AI coding comes from precise specs and acceptance criteria,
+and the bugs that matter only show up with real users and real data — so tests around the
+core invariants (totals match, balances reconcile) were the most valuable part.
 
-## Ideas para más adelante
+## Known limitations
 
-- Categorías por item (no sólo por compra completa) y gráficos de gasto en
-  el tiempo.
-- Notificación (WhatsApp/email) recordando de quién es el turno de comprar.
-- Autocompletar items recurrentes para no tener que asignarlos cada vez.
-- Exportar el resumen mensual a PDF.
+- **Access control is minimal by design.** Row Level Security allows any authenticated
+  (including anonymous) session to read and write. This is acceptable for a private app shared
+  by three trusted people, but anyone with the URL could access the data; per-household access
+  control is the next step before any wider use.
+- Splits are equal among the people sharing an item (no weights).
+- Drafts are stored per device and not synced.
 
-## Stack
+## Running it
 
-Sin build ni framework: HTML/CSS/JS plano + [PapaParse](https://www.papaparse.com/)
-para el CSV + [Supabase](https://supabase.com/) (Auth anónima + Postgres)
-para los datos compartidos. Todo corre en el navegador, servido como
-página estática por GitHub Pages.
+No build step — serve the repository root with any static server.
 
-## Desarrollo y pruebas
-
-No hay build: serví la raíz del repositorio con cualquier servidor estático.
-Para ejecutar las pruebas instalá Node.js 22 o superior y Chrome:
-
-```sh
+```bash
 npm install
-npm test
-npm run test:ui
+npm test          # unit tests
+npm run test:ui   # Playwright E2E (local server on :4173, mocked Supabase)
 ```
 
-Las pruebas de interfaz levantan un servidor local en el puerto 4173 y usan
-respuestas de Supabase simuladas, sin modificar los datos reales. Cubren vistas
-móviles y escritorio. Los paquetes npm son sólo herramientas de desarrollo.
+<details>
+<summary><b>Deploying your own instance</b></summary>
+
+1. Create a [Supabase](https://supabase.com/) project (free tier is enough) and enable
+   **Authentication → Anonymous Sign-Ins**.
+2. Run [`supabase.sql`](supabase.sql) in the SQL editor to create the `bills` and
+   `settlements` tables and their RLS policies.
+3. Put the project URL and anon key in [`js/supabase-config.js`](js/supabase-config.js)
+   (the anon key is public by design; access is governed by RLS). Edit the `PEOPLE` array
+   there to set the household members.
+4. Enable GitHub Pages (**Settings → Pages → Deploy from branch `main` / root**).
+5. On a phone, use *Add to Home Screen* (iOS) or *Install app* (Android).
+
+If the app reports a connection or date error, check that the device clock is set
+automatically — Supabase's anonymous auth tokens are time-sensitive.
+
+**CSV format:** two columns, item name and final price (discounts applied, no currency
+symbol or thousands separator). Header names are flexible (`item`/`producto`,
+`price`/`precio`); the header row is optional.
+
+</details>
